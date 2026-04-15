@@ -29,7 +29,7 @@ body {
 }
 
 /* ── SCREENS ── */
-.screen { display: none; flex-direction: column; min-height: 100dvh; padding: 52px 20px 36px; }
+.screen { display: none; flex-direction: column; min-height: 100vh; min-height: 100dvh; padding: 52px 20px 36px; }
 .screen.on { display: flex; }
 
 /* ── TYPE ── */
@@ -252,19 +252,21 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
     <div class="flex col gap-10">
       <label class="muted">API Key</label>
-      <input type="password" id="key-input" placeholder="sk-..." autocomplete="off"/>
+      <input type="password" id="key-input" placeholder="sk-..." autocomplete="off"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();setupDone();}"/>
       <div class="hint">
         🔒 Key 仅存储在本设备，不会上传<br>
         进入后可在设置中配置模型和 API 地址
       </div>
     </div>
+    <div id="setup-msg" style="display:none; padding:10px 14px; border-radius:10px; font-size:14px; text-align:center;"></div>
     <div class="hint" id="https-hint" style="display:none; border-left:3px solid var(--gold);">
       ⚠️ 语音识别需要 HTTPS<br>
       在 iPhone 上使用，请先部署到 GitHub Pages 或 Netlify<br>
       <span style="color:var(--gold); cursor:pointer;" onclick="showDeploy()">查看部署说明 →</span>
     </div>
   </div>
-  <button class="btn btn-gold" onclick="setupDone()">开始使用</button>
+  <button class="btn btn-gold" id="setup-btn" onclick="setupDone()">开始使用</button>
 </div>
 
 <!-- ═══ HOME ═══ -->
@@ -879,8 +881,13 @@ function todayTopic() {
 ═══════════════════════════════════════ */
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
-  document.getElementById(id).classList.add('on');
+  const el = document.getElementById(id);
+  el.classList.add('on');
   window.scrollTo(0, 0);
+  // Force repaint on iOS Safari
+  el.style.display = 'none';
+  el.offsetHeight; // trigger reflow
+  el.style.display = '';
 }
 
 function goHome() {
@@ -1159,12 +1166,35 @@ async function init() {
 }
 
 function setupDone() {
+  const btn = document.getElementById('setup-btn');
+  const msg = document.getElementById('setup-msg');
   const k = document.getElementById('key-input').value.trim();
-  if (!k) { alert('请输入 API Key'); return; }
-  S.apiKey = k;
-  ls('key', k);
-  S.topic = todayTopic();
-  goHome();
+
+  if (!k) {
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(224,82,82,.15)';
+    msg.style.color = '#e05252';
+    msg.textContent = '请先输入 API Key';
+    return;
+  }
+
+  btn.textContent = '进入中…';
+  btn.disabled = true;
+  msg.style.display = 'none';
+
+  try {
+    S.apiKey = k;
+    ls('key', k);
+    S.topic = todayTopic();
+    goHome();
+  } catch(e) {
+    btn.textContent = '开始使用';
+    btn.disabled = false;
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(224,82,82,.15)';
+    msg.style.color = '#e05252';
+    msg.textContent = '出错了：' + e.message;
+  }
 }
 
 function showDeploy() { document.getElementById('deploy-notice').classList.add('on'); }
