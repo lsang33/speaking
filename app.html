@@ -250,14 +250,27 @@ input:focus { outline: none; border-color: var(--gold); }
       <h1 style="margin-top:8px;">每日说</h1>
       <p class="muted" style="margin-top:10px;">每天一题，AI评估，只需开口说话</p>
     </div>
+    <div class="flex col gap-8">
+      <div class="label">API 类型</div>
+      <div class="flex gap-8">
+        <button id="setup-type-anthropic" class="type-btn active" onclick="setupSetType('anthropic')">Anthropic</button>
+        <button id="setup-type-openai" class="type-btn" onclick="setupSetType('openai')">OpenAI 兼容</button>
+      </div>
+    </div>
+    <div id="setup-openai-fields" class="flex col gap-10" style="display:none;">
+      <div class="flex gap-8" style="flex-wrap:wrap;">
+        <button class="preset-btn" onclick="setupFillPreset('deepseek', this)">DeepSeek</button>
+        <button class="preset-btn" onclick="setupFillPreset('moonshot', this)">Moonshot</button>
+        <button class="preset-btn" onclick="setupFillPreset('openrouter', this)">OpenRouter</button>
+        <button class="preset-btn" onclick="setupFillPreset('openai', this)">OpenAI</button>
+      </div>
+      <input type="text" id="setup-url-input" placeholder="https://api.deepseek.com" autocomplete="off"/>
+    </div>
     <div class="flex col gap-10">
       <label class="muted">API Key</label>
       <input type="password" id="key-input" placeholder="sk-..." autocomplete="off"
         onkeydown="if(event.key==='Enter'){event.preventDefault();setupDone();}"/>
-      <div class="hint">
-        🔒 Key 仅存储在本设备，不会上传<br>
-        进入后可在设置中配置模型和 API 地址
-      </div>
+      <div class="hint">🔒 Key 仅存储在本设备，不会上传</div>
     </div>
     <div id="setup-msg" style="display:none; padding:10px 14px; border-radius:10px; font-size:14px; text-align:center;"></div>
     <div class="hint" id="https-hint" style="display:none; border-left:3px solid var(--gold);">
@@ -880,12 +893,14 @@ function todayTopic() {
    SCREENS
 ═══════════════════════════════════════ */
 function show(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('on');
+    s.style.display = 'none';  // 用行内样式覆盖 .flex 类的 display:flex
+  });
   const el = document.getElementById(id);
   el.classList.add('on');
   window.scrollTo(0, 0);
   // Force repaint on iOS Safari
-  el.style.display = 'none';
   el.offsetHeight; // trigger reflow
   el.style.display = '';
 }
@@ -1165,10 +1180,67 @@ async function init() {
   goHome();
 }
 
-function setupDone() {
+let _setupType = 'anthropic';
+let _setupModel = '';
+
+function setupSetType(type) {
+  _setupType = type;
+  _setupModel = '';
+  document.getElementById('setup-type-anthropic').classList.toggle('active', type === 'anthropic');
+  document.getElementById('setup-type-openai').classList.toggle('active', type === 'openai');
+  document.getElementById('setup-openai-fields').style.display = type === 'openai' ? 'flex' : 'none';
+}
+
+function setupFillPreset(name, btn) {
+  const p = PRESETS[name];
+  if (p) {
+    document.getElementById('setup-url-input').value = p.url;
+    _setupModel = p.model;
+  }
+  document.querySelectorAll('#setup-openai-fields .preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+async function testKeyValid(key, type, baseUrl, model) {
+  const m = model || (type === 'anthropic' ? 'claude-haiku-4-5' : '');
+
+  if (type === 'openai') {
+    const url = (baseUrl || '').replace(/\/$/, '');
+    if (!url) return; // URL 未填，跳过验证
+    const res = await fetch(`${url}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ model: m, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+  } else {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({ model: m, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+  }
+}
+
+async function setupDone() {
   const btn = document.getElementById('setup-btn');
   const msg = document.getElementById('setup-msg');
   const k = document.getElementById('key-input').value.trim();
+  const url = _setupType === 'openai'
+    ? (document.getElementById('setup-url-input').value.trim())
+    : '';
 
   if (!k) {
     msg.style.display = 'block';
@@ -1177,14 +1249,28 @@ function setupDone() {
     msg.textContent = '请先输入 API Key';
     return;
   }
+  if (_setupType === 'openai' && !url) {
+    msg.style.display = 'block';
+    msg.style.background = 'rgba(224,82,82,.15)';
+    msg.style.color = '#e05252';
+    msg.textContent = '请填写 API 地址（或点击上方快速填写）';
+    return;
+  }
 
-  btn.textContent = '进入中…';
+  btn.textContent = '验证中…';
   btn.disabled = true;
   msg.style.display = 'none';
 
   try {
+    await testKeyValid(k, _setupType, url, _setupModel);
     S.apiKey = k;
+    S.apiType = _setupType;
+    S.apiUrl = url;
+    if (_setupModel) S.apiModel = _setupModel;
     ls('key', k);
+    ls('api_type', _setupType);
+    ls('api_url', url);
+    if (_setupModel) ls('api_model', _setupModel);
     S.topic = todayTopic();
     goHome();
   } catch(e) {
@@ -1193,7 +1279,7 @@ function setupDone() {
     msg.style.display = 'block';
     msg.style.background = 'rgba(224,82,82,.15)';
     msg.style.color = '#e05252';
-    msg.textContent = '出错了：' + e.message;
+    msg.textContent = 'Key 无效：' + e.message;
   }
 }
 
