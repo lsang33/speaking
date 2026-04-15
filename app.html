@@ -231,6 +231,38 @@ input:focus { outline: none; border-color: var(--gold); }
 .between { justify-content: space-between; align-items: center; }
 .hint { background: var(--card2); border-radius: 10px; padding: 13px 15px; font-size: 13px; line-height: 1.65; color: var(--muted); }
 
+/* ── CALENDAR ── */
+.cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.cal-nav { background:none; border:none; color:var(--muted); font-size:22px; cursor:pointer; padding:0 10px; line-height:1; }
+.cal-nav:active { opacity:.6; }
+.cal-month-label { font-size:14px; font-weight:600; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.cal-weekday { text-align:center; font-size:10px; color:var(--muted); padding:4px 0; font-weight:600; }
+.cal-day { text-align:center; padding:5px 2px 4px; border-radius:6px; font-size:12px; min-height:34px; display:flex; flex-direction:column; align-items:center; gap:3px; }
+.cal-day.other-month { opacity:.3; }
+.cal-day-num { line-height:1; }
+.cal-day.today .cal-day-num { color:var(--gold); font-weight:700; }
+.cal-day.has-record { cursor:pointer; }
+.cal-day.has-record:active { background:var(--card2); }
+.cal-dot { width:5px; height:5px; border-radius:50%; background:var(--gold); }
+
+/* ── TOPIC PICKER ── */
+.picker-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:90; }
+.picker-overlay.on { display:flex; align-items:flex-end; }
+.picker-sheet { background:var(--card); border-radius:18px 18px 0 0; width:100%; max-height:78vh; display:flex; flex-direction:column; overflow:hidden; }
+.picker-header { padding:16px 18px 10px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.picker-filter { padding:0 16px 10px; flex-shrink:0; border-bottom:1px solid #2a2a30; }
+.picker-topics { flex:1; overflow-y:auto; padding:10px 14px 16px; -webkit-overflow-scrolling:touch; }
+.picker-topic-item { padding:12px 14px; border-radius:10px; cursor:pointer; margin-bottom:6px; background:var(--card2); }
+.picker-topic-item:active { opacity:.7; }
+.picker-footer { padding:12px 16px; flex-shrink:0; border-top:1px solid #2a2a30; }
+
+/* ── TOPIC BANK ── */
+.bank-section-title { font-size:11px; font-weight:700; color:var(--gold); letter-spacing:.6px; text-transform:uppercase; padding:12px 0 5px; }
+.bank-item { background:var(--card); border-radius:10px; padding:12px 14px; display:flex; align-items:flex-start; gap:10px; margin-bottom:5px; }
+.bank-item-text { flex:1; font-size:14px; line-height:1.5; }
+.bank-item-del { background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; padding:2px 0; flex-shrink:0; margin-top:2px; }
+
 /* ── DEPLOY NOTICE ── */
 #deploy-notice {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85);
@@ -306,10 +338,15 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="muted" id="h-last-info" style="margin-top:6px;">暂无记录</div>
   </div>
 
-  <div class="flex gap-10 mt-auto">
-    <button class="btn btn-ghost" onclick="goHistory()" style="flex:1;">历史</button>
-    <button class="btn btn-ghost" onclick="goWordReady()" style="flex:1.2; border:1.5px solid var(--gold); color:var(--gold);">词语串联</button>
-    <button class="btn btn-gold" onclick="goReady()" style="flex:1.5;">开始练习</button>
+  <div class="flex col gap-8 mt-auto">
+    <div class="flex gap-8">
+      <button class="btn btn-ghost" onclick="goHistory()" style="flex:1;">历史</button>
+      <button class="btn btn-ghost" onclick="goTopics()" style="flex:1;">题库</button>
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-ghost" onclick="goWordReady()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">词语串联</button>
+      <button class="btn btn-gold" onclick="goReady()" style="flex:1.5;">开始练习</button>
+    </div>
   </div>
 </div>
 
@@ -317,7 +354,7 @@ input:focus { outline: none; border-color: var(--gold); }
 <div id="s-ready" class="screen flex col gap-18">
   <div style="display:flex; align-items:center; gap:12px;">
     <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
-    <button onclick="refreshTopic()" class="btn btn-ghost btn-sm">换题</button>
+    <button onclick="openTopicPicker()" class="btn btn-ghost btn-sm">换题</button>
   </div>
 
   <div>
@@ -467,6 +504,16 @@ input:focus { outline: none; border-color: var(--gold); }
     <h2 style="margin-top:14px;">练习归档</h2>
   </div>
 
+  <!-- 月历打卡 -->
+  <div class="card" style="padding:14px 16px;">
+    <div class="cal-header">
+      <button class="cal-nav" onclick="calPrev()">‹</button>
+      <div class="cal-month-label" id="cal-label"></div>
+      <button class="cal-nav" onclick="calNext()">›</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+
   <!-- 统计 -->
   <div id="hist-stats" class="flex gap-10"></div>
 
@@ -584,6 +631,50 @@ input:focus { outline: none; border-color: var(--gold); }
       在电脑上使用时，直接双击打开也可以（localhost 支持语音识别）。
     </div>
     <button class="btn btn-ghost" onclick="hideDeploy()">关闭</button>
+  </div>
+</div>
+
+<!-- ═══ TOPICS BANK ═══ -->
+<div id="s-topics" class="screen flex col gap-14">
+  <div class="flex between">
+    <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
+    <button onclick="showAddTopic()" class="btn btn-gold btn-sm">+ 添加题目</button>
+  </div>
+  <h2>题库</h2>
+
+  <div id="add-topic-box" class="card flex col gap-12" style="display:none;">
+    <div style="font-size:14px; font-weight:600;">添加自定义题目</div>
+    <div class="flex col gap-6">
+      <label class="muted" style="font-size:12px;">题目内容</label>
+      <textarea id="new-topic-text" style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:10px 12px;width:100%;min-height:80px;resize:vertical;font-family:inherit;" placeholder="输入你想练习的话题…"></textarea>
+    </div>
+    <div class="flex col gap-6">
+      <label class="muted" style="font-size:12px;">主题分类</label>
+      <input type="text" id="new-topic-theme" placeholder="如：生活观察、职场观察…" autocomplete="off" style="font-size:14px;"/>
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-gold" style="flex:2;" onclick="saveNewTopic()">保存</button>
+      <button class="btn btn-ghost" style="flex:1;" onclick="hideAddTopic()">取消</button>
+    </div>
+  </div>
+
+  <div id="topics-list" class="flex col gap-4"></div>
+</div>
+
+<!-- ═══ TOPIC PICKER ═══ -->
+<div id="topic-picker" class="picker-overlay" onclick="if(event.target===this)closePicker()">
+  <div class="picker-sheet">
+    <div class="picker-header">
+      <div style="font-size:15px; font-weight:600;">选择题目</div>
+      <button onclick="closePicker()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:0 6px;line-height:1;">×</button>
+    </div>
+    <div class="picker-filter">
+      <div class="filter-bar" id="picker-themes"></div>
+    </div>
+    <div class="picker-topics" id="picker-topics-list"></div>
+    <div class="picker-footer">
+      <button class="btn btn-ghost" onclick="pickRandom()">随机一题</button>
+    </div>
   </div>
 </div>
 
@@ -883,10 +974,17 @@ function computeStreak() {
   S.streak = streak;
 }
 
+function loadCustomTopics() {
+  try { return JSON.parse(ls('custom_topics') || '[]'); } catch(e) { return []; }
+}
+function saveCustomTopics(arr) { ls('custom_topics', JSON.stringify(arr)); }
+function allTopics() { return [...TOPICS, ...loadCustomTopics()]; }
+
 function todayTopic() {
   const d = new Date();
   const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-  return TOPICS[seed % TOPICS.length];
+  const pool = allTopics();
+  return pool[seed % pool.length];
 }
 
 /* ═══════════════════════════════════════
@@ -940,21 +1038,13 @@ function goReady() {
   startPrepTimer();
 }
 
-function refreshTopic() {
-  const cur = S.topic;
-  let t;
-  do { t = TOPICS[Math.floor(Math.random() * TOPICS.length)]; } while (t === cur);
-  S.topic = t;
-  renderTopicToReady(t);
-  document.getElementById('h-theme').textContent = t.theme;
-  document.getElementById('h-topic').textContent = t.text;
-  startPrepTimer(); // restart prep timer for new topic
-}
 
 function goHistory() {
   show('s-history');
   histFilter = 'all';
   expandedSessions.clear();
+  calYear = new Date().getFullYear();
+  calMonth = new Date().getMonth();
   renderHistory();
 }
 
@@ -963,6 +1053,7 @@ function renderHistory() {
     ? allSessions
     : allSessions.filter(s => s.theme === histFilter);
 
+  renderCalendar();
   renderHistStats();
   renderHistChart();
   renderHistFilter();
@@ -1066,7 +1157,7 @@ function renderHistList(sessions) {
       ? (h.evaluation.match(/\*\*鼓励\*\*[：:]([\s\S]*?)(?=\*\*|$)/) || [])[1]?.trim() : '';
 
     return `
-    <div class="hist-item">
+    <div class="hist-item" data-date="${h.date}">
       <div class="hist-header" onclick="toggleSession('${h.id}')">
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap;">
@@ -2176,6 +2267,202 @@ async function toggleAudio(id) {
     btn.disabled = false;
     alert('播放失败：' + e.message);
   }
+}
+
+/* ═══════════════════════════════════════
+   CALENDAR
+═══════════════════════════════════════ */
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+
+function renderCalendar() {
+  const el = document.getElementById('cal-grid');
+  const label = document.getElementById('cal-label');
+  if (!el) return;
+  const yr = calYear, mo = calMonth;
+  label.textContent = `${yr}年${mo + 1}月`;
+
+  const practicedDates = new Set(
+    allSessions.filter(s => {
+      const d = new Date(s.date);
+      return d.getFullYear() === yr && d.getMonth() === mo;
+    }).map(s => s.date)
+  );
+
+  const firstDay = new Date(yr, mo, 1).getDay();
+  const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+  const todayStr = today();
+  const weekdays = ['日','一','二','三','四','五','六'];
+  let html = weekdays.map(d => `<div class="cal-weekday">${d}</div>`).join('');
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day other-month"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = ds === todayStr;
+    const hasPractice = practicedDates.has(ds);
+    const cls = ['cal-day', isToday ? 'today' : '', hasPractice ? 'has-record' : ''].filter(Boolean).join(' ');
+    const dot = hasPractice ? '<div class="cal-dot"></div>' : '';
+    const click = hasPractice ? `onclick="calDayClick('${ds}')"` : '';
+    html += `<div class="${cls}" ${click}><span class="cal-day-num">${d}</span>${dot}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function calPrev() {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function calNext() {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+
+function calDayClick(dateStr) {
+  histFilter = 'all';
+  renderHistFilter();
+  renderHistList(allSessions);
+  setTimeout(() => {
+    const item = document.querySelector(`#hist-list .hist-item[data-date="${dateStr}"]`);
+    if (item) {
+      item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      item.style.outline = '2px solid var(--gold)';
+      setTimeout(() => item.style.outline = '', 1500);
+    }
+  }, 60);
+}
+
+/* ═══════════════════════════════════════
+   TOPIC PICKER
+═══════════════════════════════════════ */
+let pickerTheme = 'all';
+let _pickerTopics = [];
+
+function openTopicPicker() {
+  pickerTheme = 'all';
+  renderPickerThemes();
+  renderPickerTopics();
+  document.getElementById('topic-picker').classList.add('on');
+}
+
+function closePicker() {
+  document.getElementById('topic-picker').classList.remove('on');
+}
+
+function renderPickerThemes() {
+  const themes = ['all', ...new Set(allTopics().map(t => t.theme))];
+  document.getElementById('picker-themes').innerHTML = themes.map(th =>
+    `<button class="filter-btn${th === pickerTheme ? ' active' : ''}" onclick="setPickerTheme('${th}')">${th === 'all' ? '全部' : th}</button>`
+  ).join('');
+}
+
+function setPickerTheme(theme) {
+  pickerTheme = theme;
+  renderPickerThemes();
+  renderPickerTopics();
+}
+
+function renderPickerTopics() {
+  _pickerTopics = pickerTheme === 'all' ? allTopics() : allTopics().filter(t => t.theme === pickerTheme);
+  const el = document.getElementById('picker-topics-list');
+  if (!_pickerTopics.length) { el.innerHTML = '<div class="muted" style="padding:20px;text-align:center;">暂无题目</div>'; return; }
+  el.innerHTML = _pickerTopics.map((t, i) => `
+    <div class="picker-topic-item" onclick="pickTopic(${i})">
+      <div class="theme-badge" style="margin-bottom:5px;">${t.theme}</div>
+      <div style="font-size:14px;line-height:1.55;">${t.text}</div>
+    </div>
+  `).join('');
+}
+
+function pickTopic(i) {
+  const t = _pickerTopics[i];
+  if (!t) return;
+  S.topic = t;
+  renderTopicToReady(t);
+  document.getElementById('h-theme').textContent = t.theme;
+  document.getElementById('h-topic').textContent = t.text;
+  startPrepTimer();
+  closePicker();
+}
+
+function pickRandom() {
+  const pool = _pickerTopics.length ? _pickerTopics : allTopics();
+  if (!pool.length) return;
+  const cur = S.topic;
+  let t;
+  do { t = pool[Math.floor(Math.random() * pool.length)]; } while (t === cur && pool.length > 1);
+  S.topic = t;
+  renderTopicToReady(t);
+  document.getElementById('h-theme').textContent = t.theme;
+  document.getElementById('h-topic').textContent = t.text;
+  startPrepTimer();
+  closePicker();
+}
+
+/* ═══════════════════════════════════════
+   TOPIC BANK
+═══════════════════════════════════════ */
+function goTopics() {
+  renderTopicsPage();
+  show('s-topics');
+}
+
+function renderTopicsPage() {
+  const customs = loadCustomTopics();
+  const themes = [...new Set(TOPICS.map(t => t.theme))];
+  let html = '';
+  if (customs.length) {
+    html += '<div class="bank-section-title">自定义题目</div>';
+    html += customs.map((t, i) => `
+      <div class="bank-item">
+        <div class="bank-item-text">
+          <span class="theme-badge">${t.theme}</span>
+          <span style="display:block;margin-top:5px;">${t.text}</span>
+        </div>
+        <button class="bank-item-del" onclick="deleteCustomTopic(${i})">删除</button>
+      </div>`).join('');
+  }
+  themes.forEach(theme => {
+    html += `<div class="bank-section-title">${theme}</div>`;
+    html += TOPICS.filter(t => t.theme === theme).map(t =>
+      `<div class="bank-item"><div class="bank-item-text">${t.text}</div></div>`
+    ).join('');
+  });
+  document.getElementById('topics-list').innerHTML = html;
+}
+
+function showAddTopic() {
+  document.getElementById('add-topic-box').style.display = 'flex';
+  document.getElementById('new-topic-text').value = '';
+  document.getElementById('new-topic-theme').value = '';
+}
+
+function hideAddTopic() {
+  document.getElementById('add-topic-box').style.display = 'none';
+}
+
+function saveNewTopic() {
+  const text = document.getElementById('new-topic-text').value.trim();
+  const theme = document.getElementById('new-topic-theme').value.trim() || '自定义';
+  if (!text) {
+    document.getElementById('new-topic-text').style.borderColor = 'var(--red)';
+    return;
+  }
+  document.getElementById('new-topic-text').style.borderColor = '#333';
+  const customs = loadCustomTopics();
+  customs.push({ text, theme, d: 2 });
+  saveCustomTopics(customs);
+  hideAddTopic();
+  renderTopicsPage();
+}
+
+function deleteCustomTopic(i) {
+  if (!confirm('删除这道自定义题目？')) return;
+  const customs = loadCustomTopics();
+  customs.splice(i, 1);
+  saveCustomTopics(customs);
+  renderTopicsPage();
 }
 
 /* ═══════════════════════════════════════
