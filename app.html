@@ -1817,10 +1817,86 @@ function startMediaRecorder() {
     mr.ondataavailable = e => { if (e.data.size > 0) S.audioChunks.push(e.data); };
     mr.start(1000);
     S.mediaRecorder = mr;
+
+    // Real-time silence detection via AnalyserNode
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        const src = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        src.connect(analyser);
+        const buf = new Float32Array(analyser.fftSize);
+
+        // Calibration: collect first 300ms of RMS to set dynamic threshold
+        const calibSamples = [];
+        let threshold = 0.01; // fallback default
+        let calibDone = false;
+
+        // Pause tracking state
+        let silStart = null;       // timestamp when silence began
+        const MIN_PAUSE_MS = 500;
+        const rmsWindow = [];      // rolling RMS for volume CV
+        let pauses = [];
+
+        S._analyserCtx = ctx;
+        S._analyserTimer = setInterval(() => {
+          analyser.getFloatTimeDomainData(buf);
+          const rms = Math.sqrt(buf.reduce((s, v) => s + v * v, 0) / buf.length);
+
+          if (!calibDone) {
+            calibSamples.push(rms);
+            if (calibSamples.length >= 3) { // ~300ms
+              const peak = Math.max(...calibSamples);
+              threshold = Math.max(peak * 0.15, 0.008);
+              calibDone = true;
+            }
+            return;
+          }
+
+          rmsWindow.push(rms);
+
+          const isSilent = rms < threshold;
+          const now = Date.now();
+          if (isSilent) {
+            if (silStart === null) silStart = now;
+          } else {
+            if (silStart !== null) {
+              const dur = now - silStart;
+              if (dur >= MIN_PAUSE_MS) pauses.push(+(dur / 1000).toFixed(1));
+              silStart = null;
+            }
+          }
+        }, 100);
+
+        S._getRealtimeMetrics = () => {
+          // flush any in-progress silence
+          if (silStart !== null) {
+            const dur = Date.now() - silStart;
+            if (dur >= MIN_PAUSE_MS) pauses.push(+(dur / 1000).toFixed(1));
+          }
+          const speech = rmsWindow.filter(r => r >= threshold);
+          const mean = speech.reduce((a, b) => a + b, 0) / (speech.length || 1);
+          const std = Math.sqrt(speech.reduce((s, v) => s + (v - mean) ** 2, 0) / (speech.length || 1));
+          const cv = mean > 0 ? +(std / mean).toFixed(2) : 0;
+          return {
+            pauseCount: pauses.length,
+            totalPauseSec: +pauses.reduce((a, b) => a + b, 0).toFixed(1),
+            longestPause: pauses.length ? +Math.max(...pauses).toFixed(1) : 0,
+            volumeCV: cv,
+          };
+        };
+      }
+    } catch(e) { /* AudioContext unavailable, skip real-time metrics */ }
   }).catch(() => { /* mic permission denied, skip audio */ });
 }
 
 function stopMediaRecorder() {
+  // Stop real-time analyser
+  if (S._analyserTimer) { clearInterval(S._analyserTimer); S._analyserTimer = null; }
+  if (S._analyserCtx) { try { S._analyserCtx.close(); } catch(e) {} S._analyserCtx = null; }
+
   return new Promise(resolve => {
     if (!S.mediaRecorder || S.mediaRecorder.state === 'inactive') { resolve(null); return; }
     S.mediaRecorder.onstop = () => {
@@ -1896,14 +1972,16 @@ async function stopRec() {
   S.duration = Math.floor((Date.now() - S.startTime) / 1000);
   if (S.recognition) { try { S.recognition.stop(); } catch (e) {} S.recognition = null; }
 
-  // Save + analyse audio
+  // Grab real-time metrics before stopping (flushes final pause)
+  const realtimeMetrics = S._getRealtimeMetrics ? S._getRealtimeMetrics() : null;
+  S._getRealtimeMetrics = null;
+
+  // Stop recorder (blob only needed for playback, not analysis)
   const audioBlob = await stopMediaRecorder();
   if (audioBlob) {
     saveAudio(S.sessionId, audioBlob).catch(() => {});
-    S.audioMetrics = await analyzeAudioBlob(audioBlob);
-  } else {
-    S.audioMetrics = null;
   }
+  S.audioMetrics = realtimeMetrics;
 
   if (!S.transcript.trim()) {
     if (S.noSR) {
