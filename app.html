@@ -260,7 +260,9 @@ input:focus { outline: none; border-color: var(--gold); }
 /* ── EXAMPLE ── */
 .example-section { background:var(--card); border-radius:var(--r); padding:16px; }
 .example-tag { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; letter-spacing:.4px; background:rgba(212,168,67,.15); color:var(--gold); margin-bottom:8px; }
-.example-body { font-size:14px; line-height:1.8; color:var(--text); white-space:pre-wrap; }
+.example-body { font-size:14px; line-height:1.8; color:var(--text); }
+.example-body p { margin:0; }
+.example-body p + p { margin-top:10px; }
 .example-spin { display:flex; align-items:center; gap:10px; padding:10px 0; }
 
 /* ── TOPIC BANK ── */
@@ -268,6 +270,10 @@ input:focus { outline: none; border-color: var(--gold); }
 .bank-item { background:var(--card); border-radius:10px; padding:12px 14px; display:flex; align-items:flex-start; gap:10px; margin-bottom:5px; }
 .bank-item-text { flex:1; font-size:14px; line-height:1.5; }
 .bank-item-del { background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; padding:2px 0; flex-shrink:0; margin-top:2px; }
+.bank-item-practice { background:none; border:1px solid #444; border-radius:6px; color:var(--muted); font-size:12px; cursor:pointer; padding:3px 10px; flex-shrink:0; margin-top:2px; transition:all .15s; }
+.bank-item-practice:active { background:var(--gold); border-color:var(--gold); color:#000; }
+.interview-section-header { background:rgba(212,168,67,.08); border:1px solid rgba(212,168,67,.3); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
+.interview-subtype { font-size:10px; font-weight:700; color:var(--muted); letter-spacing:.6px; text-transform:uppercase; padding:10px 0 4px; }
 
 /* ── DEPLOY NOTICE ── */
 #deploy-notice {
@@ -339,9 +345,13 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="muted" style="margin-top:12px; font-size:13px;">点击查看详情，开始练习 →</div>
   </div>
 
-  <div class="card" id="h-last">
-    <div class="label">上次练习</div>
-    <div class="muted" id="h-last-info" style="margin-top:6px;">暂无记录</div>
+  <!-- 统计条 -->
+  <div class="flex gap-8" id="h-stats-row"></div>
+
+  <!-- 上次练习 -->
+  <div class="card" id="h-last" onclick="goHistory()" style="cursor:pointer;">
+    <div class="label" style="margin-bottom:10px;">上次练习</div>
+    <div id="h-last-content"><div class="muted" style="font-size:13px;">暂无记录</div></div>
   </div>
 
   <div class="flex col gap-8 mt-auto">
@@ -502,6 +512,7 @@ input:focus { outline: none; border-color: var(--gold); }
       <button class="preset-btn" onclick="selectExStyle('story',this)">故事引入</button>
       <button class="preset-btn" onclick="selectExStyle('opinion',this)">观点鲜明</button>
       <button class="preset-btn" onclick="selectExStyle('speech',this)">演讲风范</button>
+      <button class="preset-btn" onclick="selectExStyle('interview',this)">结构化</button>
     </div>
     <div id="example-output" style="display:none;">
       <div class="example-body" id="example-text"></div>
@@ -1003,6 +1014,20 @@ function computeStreak() {
   S.streak = streak;
 }
 
+function computeLongestStreak() {
+  const dates = [...new Set(S.history.map(h => h.date))].sort();
+  if (!dates.length) return 0;
+  let longest = 1, current = 1;
+  for (let i = 1; i < dates.length; i++) {
+    const prev = new Date(dates[i-1]);
+    const curr = new Date(dates[i]);
+    const diff = (curr - prev) / (1000 * 60 * 60 * 24);
+    if (diff === 1) { current++; longest = Math.max(longest, current); }
+    else current = 1;
+  }
+  return longest;
+}
+
 function loadCustomTopics() {
   try { return JSON.parse(ls('custom_topics') || '[]'); } catch(e) { return []; }
 }
@@ -1032,12 +1057,20 @@ function show(id) {
   el.style.display = '';
 }
 
+function randomTopic() {
+  const pool = allTopics();
+  const cur = S.topic;
+  let t;
+  do { t = pool[Math.floor(Math.random() * pool.length)]; } while (t === cur && pool.length > 1);
+  return t;
+}
+
 function goHome() {
   cancelPrepTimer();
   S.mode = 'topic';
   S.words = [];
   computeStreak();
-  if (!S.topic) S.topic = todayTopic();
+  S.topic = randomTopic();
   const now = new Date();
   const days = ['日','一','二','三','四','五','六'];
   document.getElementById('h-date').textContent =
@@ -1045,10 +1078,36 @@ function goHome() {
   document.getElementById('h-streak').textContent = S.streak;
   document.getElementById('h-theme').textContent = S.topic.theme;
   document.getElementById('h-topic').textContent = S.topic.text;
+
+  // 统计条
+  const total = allSessions.length;
+  const scored = allSessions.filter(s => parseInt(s.score));
+  const avg = scored.length
+    ? (scored.reduce((a, s) => a + parseInt(s.score), 0) / scored.length).toFixed(1)
+    : '—';
+  const longest = computeLongestStreak();
+  document.getElementById('h-stats-row').innerHTML = total ? `
+    <div class="stat-box"><div class="stat-n">${total}</div><div class="stat-l">总练习</div></div>
+    <div class="stat-box"><div class="stat-n">${avg}</div><div class="stat-l">平均分</div></div>
+    <div class="stat-box"><div class="stat-n">${longest}</div><div class="stat-l">最长连续</div></div>
+  ` : '';
+
+  // 上次练习卡
   const last = allSessions[0];
-  document.getElementById('h-last-info').textContent = last
-    ? `${last.date} · ${last.topic.slice(0, 16)}… · ${last.score || '—'}/10分`
-    : '暂无记录';
+  document.getElementById('h-last-content').innerHTML = last ? `
+    <div class="flex" style="align-items:center;gap:12px;">
+      <div style="flex:1;min-width:0;">
+        <div style="margin-bottom:5px;"><span class="theme-badge">${last.theme || '—'}</span></div>
+        <div style="font-size:14px;font-weight:500;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${last.topic || ''}</div>
+        <div class="muted" style="font-size:11px;margin-top:5px;">${last.date} · ${Math.floor((last.duration||0)/60)}分${pad((last.duration||0)%60)}秒</div>
+      </div>
+      <div class="score-ring" style="width:54px;height:54px;flex-shrink:0;">
+        <div class="score-n" style="font-size:20px;">${last.score || '—'}</div>
+        <div class="score-d">/ 10</div>
+      </div>
+    </div>
+  ` : '<div class="muted" style="font-size:13px;">暂无记录，完成第一次练习后显示</div>';
+
   show('s-home');
 }
 
@@ -1296,7 +1355,6 @@ async function init() {
   computeStreak();
 
   if (!S.apiKey) { show('s-setup'); return; }
-  S.topic = todayTopic();
   goHome();
 }
 
@@ -1391,7 +1449,6 @@ async function setupDone() {
     ls('api_type', _setupType);
     ls('api_url', url);
     if (_setupModel) ls('api_model', _setupModel);
-    S.topic = todayTopic();
     goHome();
   } catch(e) {
     btn.textContent = '开始使用';
@@ -2312,6 +2369,57 @@ async function toggleAudio(id) {
 ═══════════════════════════════════════ */
 let _exStyle = 'natural';
 
+/* ═══════════════════════════════════════
+   INTERVIEW TOPICS
+═══════════════════════════════════════ */
+const INTERVIEW_TOPICS = [
+  // ── 综合分析 ──
+  { text: "如何看待当前年轻人'考公热'持续升温的现象？", subtype: '综合分析' },
+  { text: "人工智能快速发展，对政府治理和公共服务有哪些影响？", subtype: '综合分析' },
+  { text: "部分地方政府存在'形式主义'问题，你怎么看，应如何破解？", subtype: '综合分析' },
+  { text: "农村留守儿童问题长期存在，你认为根本原因是什么，应如何解决？", subtype: '综合分析' },
+  { text: "如何理解'绿水青山就是金山银山'？结合实际谈谈你的看法。", subtype: '综合分析' },
+  { text: "老龄化社会加速到来，养老问题日益突出，你认为政府应如何应对？", subtype: '综合分析' },
+  { text: "网络谣言屡禁不止，对社会治理带来哪些挑战，如何有效应对？", subtype: '综合分析' },
+  { text: "共同富裕目标如何在基层落地？你有哪些具体建议？", subtype: '综合分析' },
+  { text: "当前青年就业压力较大，你认为政府和社会各方应如何合力解决？", subtype: '综合分析' },
+  { text: "数字政府建设加速推进，你认为在便民服务方面还有哪些短板需要补齐？", subtype: '综合分析' },
+  { text: "有人说'基层工作就是做无用功'，你怎么看待这种说法？", subtype: '综合分析' },
+  { text: "如何看待社会上'躺平'与'拼搏'两种价值观的对立？", subtype: '综合分析' },
+  // ── 人际关系 ──
+  { text: "你和同事对某项工作方案产生明显分歧，各不相让，你怎么解决？", subtype: '人际关系' },
+  { text: "领导交给你一项任务，你认为方案存在明显问题，你会怎么做？", subtype: '人际关系' },
+  { text: "一位老同事倚老卖老，经常不配合你的工作，你如何处理？", subtype: '人际关系' },
+  { text: "你发现同事存在违规行为，但他平时对你很照顾，你会怎么办？", subtype: '人际关系' },
+  { text: "你的工作成果被同事冒领，领导还当众表扬了他，你怎么处理？", subtype: '人际关系' },
+  { text: "同事向你借钱，数额不小，你们关系一般，你怎么应对？", subtype: '人际关系' },
+  { text: "新入职场，你和老员工之间存在明显的代沟，如何尽快融入团队？", subtype: '人际关系' },
+  { text: "两位领导对同一件事给出了相互矛盾的指示，你该如何处理？", subtype: '人际关系' },
+  // ── 计划组织 ──
+  { text: "领导临时要求你一周内组织一次百人规模的单位年会，你如何安排？", subtype: '计划组织' },
+  { text: "单位要开展一次面向老年群体的政策宣传活动，请谈谈你的策划思路。", subtype: '计划组织' },
+  { text: "上级同时交给你三项同样紧急的任务，你如何统筹安排？", subtype: '计划组织' },
+  { text: "你负责一个重要项目，临近截止日期发现进度严重滞后，怎么办？", subtype: '计划组织' },
+  { text: "你被安排主持一次重要会议，但事先几乎没有时间准备，你怎么办？", subtype: '计划组织' },
+  { text: "领导让你负责接待一批外省参观团，从策划到执行你如何筹备？", subtype: '计划组织' },
+  { text: "你负责组织一次跨部门联合执法行动，各部门配合意愿不强，如何推进？", subtype: '计划组织' },
+  { text: "科室人手紧张，同时有三件事需要推进，你如何分配人力和时间？", subtype: '计划组织' },
+  // ── 情景模拟 ──
+  { text: "你是窗口工作人员，一位群众情绪激动、拍桌大骂，你如何应对？", subtype: '情景模拟' },
+  { text: "你在基层走访时发现一户家庭可能隐瞒实情骗取低保，你怎么处理？", subtype: '情景模拟' },
+  { text: "你正在处理紧急公文，一位群众突然来访，要求立即解决历史遗留问题，如何应对？", subtype: '情景模拟' },
+  { text: "一位老大爷在办事大厅突然晕倒，你作为工作人员如何第一时间处置？", subtype: '情景模拟' },
+  { text: "媒体记者突然来到单位，要求就一起敏感事件进行采访，你如何应对？", subtype: '情景模拟' },
+  { text: "辖区发生群体性上访事件，你作为现场工作人员如何第一时间处置？", subtype: '情景模拟' },
+  { text: "你接到群众举报，称辖区某企业存在夜间违规排污行为，你如何处理？", subtype: '情景模拟' },
+  // ── 自我认知 ──
+  { text: "请介绍一下你自己的优点和缺点，以及为什么认为自己适合这个岗位？", subtype: '自我认知' },
+  { text: "你过去的学习或工作经历中，哪段经历对申报这个职位帮助最大？为什么？", subtype: '自我认知' },
+  { text: "如果这次考试没能通过，你会怎么做？", subtype: '自我认知' },
+  { text: "基层工作繁琐、压力大、待遇有限，你如何看待基层工作的意义？", subtype: '自我认知' },
+  { text: "五年后你希望自己在工作上达到什么状态？你有哪些具体计划？", subtype: '自我认知' },
+];
+
 const EXAMPLE_STYLES = {
   natural: {
     label: '自然对话',
@@ -2335,6 +2443,14 @@ const EXAMPLE_STYLES = {
 语言有质感，适当使用排比、对仗，但保持口语节奏；
 情感层层递进，从个人/小事延伸到普遍规律或时代意义；
 结尾升华，留有余韵，让人回味。`,
+  },
+  interview: {
+    label: '考公面试',
+    desc: `按结构化面试标准作答：开头一句话直接亮明立场或点明作答角度，不绕弯子；
+展开部分分2-3个要点，每点格式为"要点名称+简要解释+具体举措或案例"；
+语言规范有层次，有"高度"但接地气，避免空话套话；
+结尾简短总结，可适当升华到为民服务、推动社会发展等层面；
+整体口语化，适合当场说出来，约200字。`,
   },
 };
 
@@ -2367,7 +2483,7 @@ async function generateExample() {
 ${style.desc}
 
 【结构要求】
-请严格用「【开头】」「【展开】」「【收尾】」三个标签分段，每段标签单独一行，内容另起一行。
+分三段，开头、展开、收尾各一段，段落之间空一行，不要加任何标签或编号。
 
 【话题】${topic}
 【主题】${theme}
@@ -2389,11 +2505,14 @@ ${style.desc}
 }
 
 function formatExample(text) {
-  // 将【开头】【展开】【收尾】标签渲染为带色块的标签
+  // 去掉结构标签，按段落拆分渲染
   return text
-    .replace(/【(开头|展开|收尾)】/g, (_, tag) =>
-      `\n<span class="example-tag">${tag}</span>\n`)
-    .trim();
+    .replace(/【(开头|展开|收尾)】\s*/g, '')
+    .split(/\n{2,}|\n(?=\S)/)
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+    .join('');
 }
 
 /* ═══════════════════════════════════════
@@ -2478,9 +2597,11 @@ function closePicker() {
 }
 
 function renderPickerThemes() {
-  const themes = ['all', ...new Set(allTopics().map(t => t.theme))];
+  const themes = ['all', ...new Set(allTopics().map(t => t.theme)), 'interview'];
   document.getElementById('picker-themes').innerHTML = themes.map(th =>
-    `<button class="filter-btn${th === pickerTheme ? ' active' : ''}" onclick="setPickerTheme('${th}')">${th === 'all' ? '全部' : th}</button>`
+    `<button class="filter-btn${th === pickerTheme ? ' active' : ''}" onclick="setPickerTheme('${th}')">
+      ${th === 'all' ? '全部' : th === 'interview' ? '结构化面试' : th}
+    </button>`
   ).join('');
 }
 
@@ -2491,12 +2612,18 @@ function setPickerTheme(theme) {
 }
 
 function renderPickerTopics() {
-  _pickerTopics = pickerTheme === 'all' ? allTopics() : allTopics().filter(t => t.theme === pickerTheme);
+  if (pickerTheme === 'interview') {
+    _pickerTopics = INTERVIEW_TOPICS.map(t => ({ ...t, theme: '结构化面试' }));
+  } else if (pickerTheme === 'all') {
+    _pickerTopics = allTopics();
+  } else {
+    _pickerTopics = allTopics().filter(t => t.theme === pickerTheme);
+  }
   const el = document.getElementById('picker-topics-list');
   if (!_pickerTopics.length) { el.innerHTML = '<div class="muted" style="padding:20px;text-align:center;">暂无题目</div>'; return; }
   el.innerHTML = _pickerTopics.map((t, i) => `
     <div class="picker-topic-item" onclick="pickTopic(${i})">
-      <div class="theme-badge" style="margin-bottom:5px;">${t.theme}</div>
+      <div class="theme-badge" style="margin-bottom:5px;">${t.subtype || t.theme}</div>
       <div style="font-size:14px;line-height:1.55;">${t.text}</div>
     </div>
   `).join('');
@@ -2538,15 +2665,38 @@ function goTopics() {
 function renderTopicsPage() {
   const customs = loadCustomTopics();
   const themes = [...new Set(TOPICS.map(t => t.theme))];
-  const allThemes = customs.length ? ['自定义题目', ...themes] : themes;
+  const tabThemes = [
+    '结构化面试',
+    ...(customs.length ? ['自定义题目'] : []),
+    ...themes,
+  ];
 
-  // 渲染顶部标签栏
-  document.getElementById('topics-tab-bar').innerHTML = allThemes.map(th =>
+  // 顶部标签栏
+  document.getElementById('topics-tab-bar').innerHTML = tabThemes.map(th =>
     `<button class="filter-btn" onclick="topicsScrollTo('topics-sec-${th}')">${th}</button>`
   ).join('');
 
-  // 渲染列表
   let html = '';
+
+  // ── 结构化面试独立分区 ──
+  const subtypes = [...new Set(INTERVIEW_TOPICS.map(t => t.subtype))];
+  html += `
+    <div id="topics-sec-结构化面试" class="interview-section-header">
+      <div style="font-size:13px;font-weight:700;color:var(--gold);">结构化面试</div>
+      <div class="muted" style="font-size:11px;margin-top:2px;">共 ${INTERVIEW_TOPICS.length} 道 · 不参与每日随机出题</div>
+    </div>`;
+  subtypes.forEach(sub => {
+    html += `<div class="interview-subtype">${sub}</div>`;
+    html += INTERVIEW_TOPICS.filter(t => t.subtype === sub).map((t, _) => {
+      const idx = INTERVIEW_TOPICS.indexOf(t);
+      return `<div class="bank-item">
+        <div class="bank-item-text">${t.text}</div>
+        <button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>
+      </div>`;
+    }).join('');
+  });
+
+  // ── 自定义题目 ──
   if (customs.length) {
     html += `<div class="bank-section-title" id="topics-sec-自定义题目">自定义题目</div>`;
     html += customs.map((t, i) => `
@@ -2558,13 +2708,24 @@ function renderTopicsPage() {
         <button class="bank-item-del" onclick="deleteCustomTopic(${i})">删除</button>
       </div>`).join('');
   }
+
+  // ── 内置题库 ──
   themes.forEach(theme => {
     html += `<div class="bank-section-title" id="topics-sec-${theme}">${theme}</div>`;
     html += TOPICS.filter(t => t.theme === theme).map(t =>
       `<div class="bank-item"><div class="bank-item-text">${t.text}</div></div>`
     ).join('');
   });
+
   document.getElementById('topics-list').innerHTML = html;
+}
+
+function startInterviewTopic(idx) {
+  const t = INTERVIEW_TOPICS[idx];
+  if (!t) return;
+  S.topic = { text: t.text, theme: '结构化面试', subtype: t.subtype, d: 2 };
+  S.mode = 'topic';
+  goReady();
 }
 
 function topicsScrollTo(id) {
