@@ -232,19 +232,19 @@ input:focus { outline: none; border-color: var(--gold); }
 .hint { background: var(--card2); border-radius: 10px; padding: 13px 15px; font-size: 13px; line-height: 1.65; color: var(--muted); }
 
 /* ── CALENDAR ── */
-.cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-.cal-nav { background:none; border:none; color:var(--muted); font-size:22px; cursor:pointer; padding:0 10px; line-height:1; }
+.cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+.cal-nav { background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:0 8px; line-height:1; }
 .cal-nav:active { opacity:.6; }
-.cal-month-label { font-size:14px; font-weight:600; }
-.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
-.cal-weekday { text-align:center; font-size:10px; color:var(--muted); padding:4px 0; font-weight:600; }
-.cal-day { text-align:center; padding:5px 2px 4px; border-radius:6px; font-size:12px; min-height:34px; display:flex; flex-direction:column; align-items:center; gap:3px; }
+.cal-month-label { font-size:13px; font-weight:600; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; }
+.cal-weekday { text-align:center; font-size:9px; color:var(--muted); padding:3px 0; font-weight:600; }
+.cal-day { text-align:center; padding:3px 1px 2px; border-radius:4px; font-size:11px; min-height:26px; display:flex; flex-direction:column; align-items:center; gap:2px; }
 .cal-day.other-month { opacity:.3; }
 .cal-day-num { line-height:1; }
 .cal-day.today .cal-day-num { color:var(--gold); font-weight:700; }
 .cal-day.has-record { cursor:pointer; }
 .cal-day.has-record:active { background:var(--card2); }
-.cal-dot { width:5px; height:5px; border-radius:50%; background:var(--gold); }
+.cal-dot { width:4px; height:4px; border-radius:50%; background:var(--gold); }
 
 /* ── TOPIC PICKER ── */
 .picker-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:90; }
@@ -256,6 +256,12 @@ input:focus { outline: none; border-color: var(--gold); }
 .picker-topic-item { padding:12px 14px; border-radius:10px; cursor:pointer; margin-bottom:6px; background:var(--card2); }
 .picker-topic-item:active { opacity:.7; }
 .picker-footer { padding:12px 16px; flex-shrink:0; border-top:1px solid #2a2a30; }
+
+/* ── EXAMPLE ── */
+.example-section { background:var(--card); border-radius:var(--r); padding:16px; }
+.example-tag { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700; letter-spacing:.4px; background:rgba(212,168,67,.15); color:var(--gold); margin-bottom:8px; }
+.example-body { font-size:14px; line-height:1.8; color:var(--text); white-space:pre-wrap; }
+.example-spin { display:flex; align-items:center; gap:10px; padding:10px 0; }
 
 /* ── TOPIC BANK ── */
 .bank-section-title { font-size:11px; font-weight:700; color:var(--gold); letter-spacing:.6px; text-transform:uppercase; padding:12px 0 5px; }
@@ -488,6 +494,25 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <div style="background:var(--card); border-radius:var(--r); padding:16px; text-align:center; font-size:15px; font-weight:500; color:var(--gold); line-height:1.6;" id="res-cheer"></div>
 
+  <!-- 示范参考 -->
+  <div class="example-section">
+    <div class="label" style="margin-bottom:12px;">示范参考</div>
+    <div class="flex gap-6" id="example-style-chips" style="flex-wrap:wrap; margin-bottom:12px;">
+      <button class="preset-btn active" onclick="selectExStyle('natural',this)">自然对话</button>
+      <button class="preset-btn" onclick="selectExStyle('story',this)">故事引入</button>
+      <button class="preset-btn" onclick="selectExStyle('opinion',this)">观点鲜明</button>
+      <button class="preset-btn" onclick="selectExStyle('speech',this)">演讲风范</button>
+    </div>
+    <div id="example-output" style="display:none;">
+      <div class="example-body" id="example-text"></div>
+    </div>
+    <div id="example-loading" class="example-spin" style="display:none;">
+      <div class="spin" style="width:22px;height:22px;border-width:2px;"></div>
+      <span class="muted" style="font-size:13px;">生成示范中…</span>
+    </div>
+    <button class="btn btn-ghost" id="example-btn" onclick="generateExample()" style="margin-top:4px;">生成示范</button>
+  </div>
+
   <div class="flex gap-10 mt-auto">
     <button class="btn btn-ghost" onclick="goHistory()" style="flex:1;">历史</button>
     <button class="btn btn-gold" onclick="goHome()" style="flex:2;">完成</button>
@@ -505,7 +530,7 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
 
   <!-- 月历打卡 -->
-  <div class="card" style="padding:14px 16px;">
+  <div class="card" style="padding:10px 12px;">
     <div class="cal-header">
       <button class="cal-nav" onclick="calPrev()">‹</button>
       <div class="cal-month-label" id="cal-label"></div>
@@ -642,6 +667,9 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
   <h2>题库</h2>
 
+  <!-- 类别标签栏 -->
+  <div class="filter-bar" id="topics-tab-bar"></div>
+
   <div id="add-topic-box" class="card flex col gap-12" style="display:none;">
     <div style="font-size:14px; font-weight:600;">添加自定义题目</div>
     <div class="flex col gap-6">
@@ -650,7 +678,8 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
     <div class="flex col gap-6">
       <label class="muted" style="font-size:12px;">主题分类</label>
-      <input type="text" id="new-topic-theme" placeholder="如：生活观察、职场观察…" autocomplete="off" style="font-size:14px;"/>
+      <div class="flex gap-6" id="new-topic-theme-chips" style="flex-wrap:wrap;"></div>
+      <input type="hidden" id="new-topic-theme" value=""/>
     </div>
     <div class="flex gap-8">
       <button class="btn btn-gold" style="flex:2;" onclick="saveNewTopic()">保存</button>
@@ -2118,6 +2147,15 @@ function showResult(session, evalText) {
 
   const cm = evalText.match(/\*\*鼓励\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   document.getElementById('res-cheer').textContent = cm ? cm[1].trim() : '继续坚持，每天进步一点点。';
+
+  // 重置示范参考区
+  _exStyle = 'natural';
+  document.querySelectorAll('#example-style-chips .preset-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+  document.getElementById('example-output').style.display = 'none';
+  document.getElementById('example-loading').style.display = 'none';
+  document.getElementById('example-btn').style.display = 'block';
+  document.getElementById('example-btn').textContent = '生成示范';
+
   show('s-result');
 }
 
@@ -2270,6 +2308,95 @@ async function toggleAudio(id) {
 }
 
 /* ═══════════════════════════════════════
+   EXAMPLE
+═══════════════════════════════════════ */
+let _exStyle = 'natural';
+
+const EXAMPLE_STYLES = {
+  natural: {
+    label: '自然对话',
+    desc: `语言自然随意，像跟朋友聊天；短句为主，多用"你有没有发现…""说真的，我觉得…"等口语过渡；
+有真实的个人感受，不说套话；结构自然流动，不刻意。`,
+  },
+  story: {
+    label: '故事引入',
+    desc: `开头用一个具体的个人场景或经历引入，有时间、地点、细节；
+从故事中自然引出观点；中间展开时保持叙述感；结尾落回观点，简洁有力。`,
+  },
+  opinion: {
+    label: '观点鲜明',
+    desc: `开头直接亮出一个有点反常规、出人意料的核心立场；
+用清晰的逻辑逐层论证，有例子支撑；语气自信，敢于表达判断；
+结尾强化立场，不模糊收尾。`,
+  },
+  speech: {
+    label: '演讲风范',
+    desc: `开头引用一句古诗、名言或历史典故切入，建立格调；
+语言有质感，适当使用排比、对仗，但保持口语节奏；
+情感层层递进，从个人/小事延伸到普遍规律或时代意义；
+结尾升华，留有余韵，让人回味。`,
+  },
+};
+
+function selectExStyle(style, btn) {
+  _exStyle = style;
+  document.querySelectorAll('#example-style-chips .preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // 已有内容时切换风格清空，引导重新生成
+  document.getElementById('example-output').style.display = 'none';
+  document.getElementById('example-btn').textContent = '生成示范';
+}
+
+async function generateExample() {
+  const topic = S.topic?.text || '';
+  const theme = S.topic?.theme || '';
+  if (!topic) return;
+
+  const btn = document.getElementById('example-btn');
+  const loading = document.getElementById('example-loading');
+  const output = document.getElementById('example-output');
+
+  btn.style.display = 'none';
+  loading.style.display = 'flex';
+  output.style.display = 'none';
+
+  const style = EXAMPLE_STYLES[_exStyle];
+  const prompt = `你是口语表达教练。请为以下话题写一段口语示范稿（约200字），供练习者参考学习。
+
+【风格要求】
+${style.desc}
+
+【结构要求】
+请严格用「【开头】」「【展开】」「【收尾】」三个标签分段，每段标签单独一行，内容另起一行。
+
+【话题】${topic}
+【主题】${theme}
+
+注意：写的是口头表达，不是书面文章；字数控制在200字左右。`;
+
+  try {
+    const result = await callLLM(prompt);
+    document.getElementById('example-text').innerHTML = formatExample(result);
+    output.style.display = 'block';
+    btn.textContent = '重新生成';
+    btn.style.display = 'block';
+  } catch(e) {
+    btn.textContent = '生成失败，点击重试';
+    btn.style.display = 'block';
+  } finally {
+    loading.style.display = 'none';
+  }
+}
+
+function formatExample(text) {
+  // 将【开头】【展开】【收尾】标签渲染为带色块的标签
+  return text
+    .replace(/【(开头|展开|收尾)】/g, (_, tag) =>
+      `\n<span class="example-tag">${tag}</span>\n`)
+    .trim();
+}
+
+/* ═══════════════════════════════════════
    CALENDAR
 ═══════════════════════════════════════ */
 let calYear = new Date().getFullYear();
@@ -2411,9 +2538,17 @@ function goTopics() {
 function renderTopicsPage() {
   const customs = loadCustomTopics();
   const themes = [...new Set(TOPICS.map(t => t.theme))];
+  const allThemes = customs.length ? ['自定义题目', ...themes] : themes;
+
+  // 渲染顶部标签栏
+  document.getElementById('topics-tab-bar').innerHTML = allThemes.map(th =>
+    `<button class="filter-btn" onclick="topicsScrollTo('topics-sec-${th}')">${th}</button>`
+  ).join('');
+
+  // 渲染列表
   let html = '';
   if (customs.length) {
-    html += '<div class="bank-section-title">自定义题目</div>';
+    html += `<div class="bank-section-title" id="topics-sec-自定义题目">自定义题目</div>`;
     html += customs.map((t, i) => `
       <div class="bank-item">
         <div class="bank-item-text">
@@ -2424,7 +2559,7 @@ function renderTopicsPage() {
       </div>`).join('');
   }
   themes.forEach(theme => {
-    html += `<div class="bank-section-title">${theme}</div>`;
+    html += `<div class="bank-section-title" id="topics-sec-${theme}">${theme}</div>`;
     html += TOPICS.filter(t => t.theme === theme).map(t =>
       `<div class="bank-item"><div class="bank-item-text">${t.text}</div></div>`
     ).join('');
@@ -2432,10 +2567,26 @@ function renderTopicsPage() {
   document.getElementById('topics-list').innerHTML = html;
 }
 
+function topicsScrollTo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function showAddTopic() {
   document.getElementById('add-topic-box').style.display = 'flex';
   document.getElementById('new-topic-text').value = '';
   document.getElementById('new-topic-theme').value = '';
+  // 渲染主题选择 chips
+  const themes = [...new Set(TOPICS.map(t => t.theme))];
+  document.getElementById('new-topic-theme-chips').innerHTML = themes.map(th =>
+    `<button type="button" class="preset-btn" onclick="selectNewTheme('${th}', this)">${th}</button>`
+  ).join('');
+}
+
+function selectNewTheme(theme, btn) {
+  document.getElementById('new-topic-theme').value = theme;
+  document.querySelectorAll('#new-topic-theme-chips .preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
 }
 
 function hideAddTopic() {
