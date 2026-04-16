@@ -509,22 +509,23 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <!-- 示范参考 -->
   <div class="example-section">
-    <div class="label" style="margin-bottom:12px;">示范参考</div>
-    <div class="flex gap-6" id="example-style-chips" style="flex-wrap:wrap; margin-bottom:12px;">
-      <button class="preset-btn active" onclick="selectExStyle('natural',this)">自然对话</button>
-      <button class="preset-btn" onclick="selectExStyle('story',this)">故事引入</button>
-      <button class="preset-btn" onclick="selectExStyle('opinion',this)">观点鲜明</button>
-      <button class="preset-btn" onclick="selectExStyle('speech',this)">演讲风范</button>
-      <button class="preset-btn" onclick="selectExStyle('interview',this)">结构化</button>
+    <button class="btn btn-ghost" id="example-btn" onclick="openExample()" style="width:100%;">生成示范</button>
+    <div id="example-expanded" style="display:none;">
+      <div class="flex gap-6" id="example-style-chips" style="flex-wrap:wrap; margin:12px 0 4px;">
+        <button class="preset-btn active" onclick="selectExStyle('natural',this)">自然对话</button>
+        <button class="preset-btn" onclick="selectExStyle('story',this)">故事引入</button>
+        <button class="preset-btn" onclick="selectExStyle('opinion',this)">观点鲜明</button>
+        <button class="preset-btn" onclick="selectExStyle('speech',this)">演讲风范</button>
+        <button class="preset-btn" onclick="selectExStyle('interview',this)">结构化</button>
+      </div>
+      <div id="example-loading" class="example-spin" style="display:none;">
+        <div class="spin" style="width:22px;height:22px;border-width:2px;"></div>
+        <span class="muted" style="font-size:13px;">生成示范中…</span>
+      </div>
+      <div id="example-output" style="display:none;">
+        <div class="example-body" id="example-text"></div>
+      </div>
     </div>
-    <div id="example-output" style="display:none;">
-      <div class="example-body" id="example-text"></div>
-    </div>
-    <div id="example-loading" class="example-spin" style="display:none;">
-      <div class="spin" style="width:22px;height:22px;border-width:2px;"></div>
-      <span class="muted" style="font-size:13px;">生成示范中…</span>
-    </div>
-    <button class="btn btn-ghost" id="example-btn" onclick="generateExample()" style="margin-top:4px;">生成示范</button>
   </div>
 
   <!-- 调试面板 -->
@@ -1122,12 +1123,12 @@ function goHome() {
     : '—';
   const longest = computeLongestStreak();
   const practicedToday = allSessions.some(s => s.date === today());
-  document.getElementById('h-stats-row').innerHTML = total ? `
-    <div class="stat-box"><div class="stat-n">${total}</div><div class="stat-l">总练习</div></div>
+  document.getElementById('h-stats-row').innerHTML = `
+    <div class="stat-box"><div class="stat-n">${total || 0}</div><div class="stat-l">总练习</div></div>
     <div class="stat-box"><div class="stat-n">${avg}</div><div class="stat-l">平均分</div></div>
-    <div class="stat-box"><div class="stat-n">${longest}</div><div class="stat-l">最长连续</div></div>
+    <div class="stat-box"><div class="stat-n">${longest || 0}</div><div class="stat-l">最长连续</div></div>
     <div class="stat-box"><div class="stat-n" style="color:${practicedToday ? 'var(--gold)' : 'var(--muted)'};">${practicedToday ? '✓' : '—'}</div><div class="stat-l">今日</div></div>
-  ` : '';
+  `;
 
   // 上次练习卡
   const last = allSessions[0];
@@ -2367,10 +2368,10 @@ function showResult(session, evalText) {
   // 重置示范参考区
   _exStyle = 'natural';
   document.querySelectorAll('#example-style-chips .preset-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+  document.getElementById('example-expanded').style.display = 'none';
   document.getElementById('example-output').style.display = 'none';
   document.getElementById('example-loading').style.display = 'none';
   document.getElementById('example-btn').style.display = 'block';
-  document.getElementById('example-btn').textContent = '生成示范';
 
   show('s-result');
 }
@@ -2613,13 +2614,16 @@ const EXAMPLE_STYLES = {
   },
 };
 
+function openExample() {
+  document.getElementById('example-expanded').style.display = 'block';
+  document.getElementById('example-btn').style.display = 'none';
+}
+
 function selectExStyle(style, btn) {
   _exStyle = style;
   document.querySelectorAll('#example-style-chips .preset-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  // 已有内容时切换风格清空，引导重新生成
-  document.getElementById('example-output').style.display = 'none';
-  document.getElementById('example-btn').textContent = '生成示范';
+  generateExample();
 }
 
 async function generateExample() {
@@ -2627,15 +2631,15 @@ async function generateExample() {
   const theme = S.topic?.theme || '';
   if (!topic) return;
 
-  const btn = document.getElementById('example-btn');
   const loading = document.getElementById('example-loading');
   const output = document.getElementById('example-output');
 
-  btn.style.display = 'none';
   loading.style.display = 'flex';
   output.style.display = 'none';
 
   const style = EXAMPLE_STYLES[_exStyle];
+  const isWord = S.mode === 'word' && S.words?.length;
+  const wordLine = isWord ? `\n【必须串联的词语】${S.words.join('、')}（每个词语必须自然出现在示范中）` : '';
   const prompt = `你是口语表达教练。请为以下话题写一段口语示范稿（约200字），供练习者参考学习。
 
 【风格要求】
@@ -2645,7 +2649,7 @@ ${style.desc}
 分三段，开头、展开、收尾各一段，段落之间空一行，不要加任何标签或编号。
 
 【话题】${topic}
-【主题】${theme}
+【主题】${theme}${wordLine}
 
 注意：写的是口头表达，不是书面文章；字数控制在200字左右。`;
 
@@ -2653,11 +2657,9 @@ ${style.desc}
     const result = await callLLM(prompt);
     document.getElementById('example-text').innerHTML = formatExample(result);
     output.style.display = 'block';
-    btn.textContent = '重新生成';
-    btn.style.display = 'block';
   } catch(e) {
-    btn.textContent = '生成失败，点击重试';
-    btn.style.display = 'block';
+    output.innerHTML = '<div class="muted" style="font-size:13px;">生成失败，请重试</div>';
+    output.style.display = 'block';
   } finally {
     loading.style.display = 'none';
   }
