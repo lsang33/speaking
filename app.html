@@ -334,7 +334,7 @@ input:focus { outline: none; border-color: var(--gold); }
       <h2 style="margin-top:3px;">每日说</h2>
     </div>
     <div class="flex" style="align-items:center; gap:8px;">
-      <div class="streak">🔥 <span id="h-streak">0</span> 天</div>
+      <div style="font-size:13px; color:var(--muted);">连续 <span id="h-streak" style="color:var(--gold); font-weight:600;">0</span> 天</div>
       <button class="settings-icon" onclick="goSettings()" title="设置">⚙</button>
     </div>
   </div>
@@ -487,7 +487,10 @@ input:focus { outline: none; border-color: var(--gold); }
 <div id="s-result" class="screen flex col gap-14">
   <div class="flex between" style="padding-top:4px;">
     <div>
-      <h2>本次评估</h2>
+      <div class="flex" style="align-items:baseline; gap:10px;">
+        <h2>本次评估</h2>
+        <button id="debug-btn" onclick="toggleDebugPanel()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--muted);padding:0;">原始</button>
+      </div>
       <div class="muted" id="res-meta" style="margin-top:3px; font-size:13px;"></div>
     </div>
     <div class="score-ring">
@@ -522,6 +525,22 @@ input:focus { outline: none; border-color: var(--gold); }
       <span class="muted" style="font-size:13px;">生成示范中…</span>
     </div>
     <button class="btn btn-ghost" id="example-btn" onclick="generateExample()" style="margin-top:4px;">生成示范</button>
+  </div>
+
+  <!-- 调试面板 -->
+  <div id="debug-panel" style="display:none;">
+    <div style="background:#111; border-radius:var(--r); overflow:hidden;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-bottom:1px solid #222;">
+        <span style="font-size:12px; color:var(--muted); font-family:monospace;">发送给大模型的 Prompt</span>
+        <button onclick="copyDebugPrompt()" style="font-size:11px; color:var(--gold); background:none; border:none; cursor:pointer; padding:0;">复制</button>
+      </div>
+      <pre id="debug-prompt" style="margin:0; padding:12px 14px; font-size:11px; color:#ccc; white-space:pre-wrap; word-break:break-all; max-height:240px; overflow-y:auto; font-family:monospace; line-height:1.5;"></pre>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-top:1px solid #222; border-bottom:1px solid #222;">
+        <span style="font-size:12px; color:var(--muted); font-family:monospace;">大模型返回</span>
+        <button onclick="copyDebugResponse()" style="font-size:11px; color:var(--gold); background:none; border:none; cursor:pointer; padding:0;">复制</button>
+      </div>
+      <pre id="debug-response" style="margin:0; padding:12px 14px; font-size:11px; color:#ccc; white-space:pre-wrap; word-break:break-all; max-height:240px; overflow-y:auto; font-family:monospace; line-height:1.5;"></pre>
+    </div>
   </div>
 
   <div class="flex gap-10 mt-auto">
@@ -626,6 +645,21 @@ input:focus { outline: none; border-color: var(--gold); }
       <button class="preset-btn" onclick="setSettingsWC(5)">5个</button>
     </div>
     <input type="hidden" id="cfg-word-count" value="3"/>
+  </div>
+
+  <!-- 停顿阈值 -->
+  <div class="flex col gap-8">
+    <div class="label">停顿计入时长</div>
+    <div class="flex gap-8" style="flex-wrap:wrap;" id="pause-thresh-chips">
+      <button class="preset-btn" onclick="setPauseThreshChip(500)">0.5秒</button>
+      <button class="preset-btn" onclick="setPauseThreshChip(1000)">1秒</button>
+      <button class="preset-btn" onclick="setPauseThreshChip(1500)">1.5秒</button>
+      <button class="preset-btn" onclick="setPauseThreshChip(2000)">2秒</button>
+    </div>
+    <div class="flex gap-8" style="align-items:center;">
+      <input type="number" id="cfg-pause-thresh" min="300" max="5000" step="100" style="width:100px; padding:10px 12px;" placeholder="毫秒"/>
+      <span class="muted" style="font-size:13px;">毫秒（超过此时长才计为停顿）</span>
+    </div>
   </div>
 
   <!-- 准备时间 -->
@@ -966,6 +1000,7 @@ let S = {
   apiType: ls('api_type') || 'anthropic',
   apiUrl: ls('api_url') || '',
   apiModel: ls('api_model') || '',
+  pauseThresh: parseInt(ls('pause_thresh') || '1000', 10),
   prepTime: parseInt(ls('prep_time') || '30', 10),
   mode: 'topic',       // 'topic' | 'word'
   wordCount: parseInt(ls('word_count') || '3', 10),
@@ -1086,10 +1121,12 @@ function goHome() {
     ? (scored.reduce((a, s) => a + parseInt(s.score), 0) / scored.length).toFixed(1)
     : '—';
   const longest = computeLongestStreak();
+  const practicedToday = allSessions.some(s => s.date === today());
   document.getElementById('h-stats-row').innerHTML = total ? `
     <div class="stat-box"><div class="stat-n">${total}</div><div class="stat-l">总练习</div></div>
     <div class="stat-box"><div class="stat-n">${avg}</div><div class="stat-l">平均分</div></div>
     <div class="stat-box"><div class="stat-n">${longest}</div><div class="stat-l">最长连续</div></div>
+    <div class="stat-box"><div class="stat-n" style="color:${practicedToday ? 'var(--gold)' : 'var(--muted)'};">${practicedToday ? '✓' : '—'}</div><div class="stat-l">今日</div></div>
   ` : '';
 
   // 上次练习卡
@@ -1107,6 +1144,7 @@ function goHome() {
       </div>
     </div>
   ` : '<div class="muted" style="font-size:13px;">暂无记录，完成第一次练习后显示</div>';
+
 
   show('s-home');
 }
@@ -1126,6 +1164,26 @@ function goReady() {
   startPrepTimer();
 }
 
+
+function toggleDebugPanel() {
+  const panel = document.getElementById('debug-panel');
+  const btn = document.getElementById('debug-btn');
+  const open = panel.style.display === 'none';
+  if (open) {
+    document.getElementById('debug-prompt').textContent = S.debugLastPrompt || '（无数据）';
+    document.getElementById('debug-response').textContent = S.debugLastResponse || '（无数据）';
+  }
+  panel.style.display = open ? 'block' : 'none';
+  btn.style.color = open ? 'var(--gold)' : 'var(--muted)';
+}
+
+function copyDebugPrompt() {
+  navigator.clipboard.writeText(S.debugLastPrompt || '').catch(() => {});
+}
+
+function copyDebugResponse() {
+  navigator.clipboard.writeText(S.debugLastResponse || '').catch(() => {});
+}
 
 function goHistory() {
   show('s-history');
@@ -1157,11 +1215,7 @@ function renderHistStats() {
   const avg = scored.length
     ? (scored.reduce((a, s) => a + parseInt(s.score), 0) / scored.length).toFixed(1)
     : '—';
-  el.innerHTML = `
-    <div class="stat-box"><div class="stat-n">${total}</div><div class="stat-l">累计次数</div></div>
-    <div class="stat-box"><div class="stat-n">${avg}</div><div class="stat-l">平均分</div></div>
-    <div class="stat-box"><div class="stat-n">${S.streak}</div><div class="stat-l">连续天数</div></div>
-  `;
+  el.innerHTML = '';
 }
 
 function renderHistChart() {
@@ -1491,6 +1545,8 @@ function goSettings() {
   updatePrepTimeChips(pt);
   document.getElementById('cfg-word-count').value = S.wordCount;
   updateSettingsWCChips(S.wordCount);
+  document.getElementById('cfg-pause-thresh').value = S.pauseThresh;
+  updatePauseThreshChips(S.pauseThresh);
   show('s-settings');
 }
 
@@ -1537,6 +1593,9 @@ function saveSettings() {
   const wc = parseInt(document.getElementById('cfg-word-count').value || '3', 10);
   S.wordCount = isNaN(wc) ? 3 : Math.min(5, Math.max(2, wc));
   ls('word_count', S.wordCount);
+  const thresh = parseInt(document.getElementById('cfg-pause-thresh').value || '1000', 10);
+  S.pauseThresh = isNaN(thresh) ? 1000 : Math.min(5000, Math.max(300, thresh));
+  ls('pause_thresh', S.pauseThresh);
   goHome();
 }
 
@@ -1743,6 +1802,17 @@ function setPrepTimeChip(val) {
   updatePrepTimeChips(val);
 }
 
+function updatePauseThreshChips(val) {
+  const chips = document.querySelectorAll('#pause-thresh-chips .preset-btn');
+  const vals = [500, 1000, 1500, 2000];
+  chips.forEach((btn, i) => btn.classList.toggle('active', vals[i] === val));
+}
+
+function setPauseThreshChip(val) {
+  document.getElementById('cfg-pause-thresh').value = val;
+  updatePauseThreshChips(val);
+}
+
 function startPrepTimer() {
   cancelPrepTimer();
   const total = S.prepTime || 0;
@@ -1836,7 +1906,7 @@ function startMediaRecorder() {
 
         // Pause tracking state
         let silStart = null;       // timestamp when silence began
-        const MIN_PAUSE_MS = 500;
+        const MIN_PAUSE_MS = S.pauseThresh || 1000;
         const rmsWindow = [];      // rolling RMS for volume CV
         let pauses = [];
 
@@ -2092,8 +2162,12 @@ async function evaluate() {
 
   let audioSection = '';
   if (audioMetrics) {
+    const pc = audioMetrics.pauseCount;
+    const lp = audioMetrics.longestPause;
+    const pauseNote = pc === 0 ? '✓无明显停顿' : lp >= 3 ? `⚠️含长停顿 ${lp}s` : pc <= 3 ? '少量停顿' : pc <= 6 ? '停顿偏多' : '⚠️停顿过多';
     const volNote = audioMetrics.volumeCV < 0.25 ? '较单调' : audioMetrics.volumeCV < 0.5 ? '有起伏' : '变化丰富';
-    audioSection = `- 有效停顿（≥0.5秒）：${audioMetrics.pauseCount} 次，最长 ${audioMetrics.longestPause} 秒
+    const threshSec = ((S.pauseThresh || 1000) / 1000).toFixed(1).replace(/\.0$/, '');
+    audioSection = `- 有效停顿（≥${threshSec}秒）：${pc} 次，最长 ${lp} 秒（${pauseNote}，均视为卡顿，≤3次正常，≥7次或单次≥3秒明显扣分）
 - 音量变化指数：${audioMetrics.volumeCV}（${volNote}，0=完全单调）`;
   }
 
@@ -2122,17 +2196,17 @@ ${audioSection}
 「${transcript || '（未能获取转写内容）'}」
 
 【评分标准——严格参照，不得虚高】
-9-10分：所有词语自然融入，逻辑完整，语言流畅，无明显口头禅，时长达标
-7-8分：词语全部覆盖，逻辑基本清晰，口头禅≤2次
-5-6分：覆盖≥60%词语，有基本逻辑，或时长不足90秒
-3-4分：覆盖＜60%词语，或逻辑混乱，口头禅≥6次
+9-10分：所有词语自然融入，逻辑完整，语言流畅，无明显口头禅，停顿≤3次且无长停顿，时长达标
+7-8分：词语全部覆盖，逻辑基本清晰，口头禅≤2次，停顿≤6次
+5-6分：覆盖≥60%词语，有基本逻辑，或时长不足90秒，或停顿7-9次
+3-4分：覆盖＜60%词语，或逻辑混乱，口头禅≥6次，或停顿≥10次或单次停顿≥3秒
 1-2分：基本未覆盖词语，或内容极少
 
 【输出格式——严格按此，每项不超过2句】
 
 **词语串联**：[哪些词语用得自然？哪些生硬或遗漏？]
 **逻辑结构**：[有无完整的观点-论据-升华，衔接是否流畅]
-**语言流畅度**：[结合口头禅数据评价]
+**语言流畅度**：[结合口头禅和停顿数据评价，停顿过多或有长停顿须指出]
 **本次亮点**：[最精彩的一句，直接引用原文]
 **明日聚焦**：[下次串联可尝试的一个具体技巧]
 **评分**：[X/10，整数，必须与客观数据一致]
@@ -2155,16 +2229,16 @@ ${audioSection}
 「${transcript || '（未能获取转写内容）'}」
 
 【评分标准——严格参照，不得虚高】
-9-10分：逻辑完整（观点→论据→升华），口头禅 0 次，语速适中，有感染力，时长达标
-7-8分：逻辑清晰，口头禅 ≤2 次，能完整表达观点，时长基本达标
-5-6分：有基本观点但逻辑松散，口头禅 3-5 次，或时长不足 90 秒
-3-4分：思路混乱，口头禅 ≥6 次，或严重偏题，或时长极短
+9-10分：逻辑完整（观点→论据→升华），口头禅 0 次，停顿≤3次且无长停顿，语速适中，有感染力，时长达标
+7-8分：逻辑清晰，口头禅 ≤2 次，停顿≤6次，能完整表达观点，时长基本达标
+5-6分：有基本观点但逻辑松散，口头禅 3-5 次，或停顿 7-9 次，或时长不足 90 秒
+3-4分：思路混乱，口头禅 ≥6 次，或停顿≥10次或单次停顿≥3秒，或严重偏题，或时长极短
 1-2分：内容极少、无关主题或无法理解
 
 【输出格式——严格按此，每项不超过2句】
 
 **逻辑结构**：[有无观点-论据-升华层次，结构是否完整]
-**语言流畅度**：[结合口头禅数据评价，如有请点名是哪个词]
+**语言流畅度**：[结合口头禅和停顿数据评价，口头禅点名，长停顿须指出]
 **本次亮点**：[最精彩的一句，直接引用原文]
 **明日聚焦**：[最应改进的一点，给出具体做法]
 **评分**：[X/10，整数，必须与客观数据一致]
@@ -2172,7 +2246,10 @@ ${audioSection}
   }
 
   try {
+    S.debugLastPrompt = prompt;
+    S.debugLastResponse = '';
     const evalText = await callLLM(prompt);
+    S.debugLastResponse = evalText;
 
     const scoreM = evalText.match(/\*\*评分\*\*[：:]\s*(\d+)/);
     const score = scoreM ? scoreM[1] : '—';
@@ -2282,6 +2359,10 @@ function showResult(session, evalText) {
 
   const cm = evalText.match(/\*\*鼓励\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   document.getElementById('res-cheer').textContent = cm ? cm[1].trim() : '继续坚持，每天进步一点点。';
+
+  // 重置调试面板
+  document.getElementById('debug-panel').style.display = 'none';
+  document.getElementById('debug-btn').style.color = 'var(--muted)';
 
   // 重置示范参考区
   _exStyle = 'natural';
