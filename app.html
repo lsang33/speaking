@@ -550,6 +550,8 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
+  <div id="res-score-reason" style="display:none; font-size:13px; color:var(--muted); background:var(--card); border-radius:10px; padding:10px 14px; line-height:1.6;"></div>
+
   <div class="topic-card" style="padding:14px 18px;" id="res-topic-display"></div>
 
   <div id="res-metrics"></div>
@@ -1297,6 +1299,7 @@ function parseEvalSections(evalText) {
     { k: '语言流畅度', icon: '🗣' },
     { k: '本次亮点', icon: '✨' },
     { k: '明日聚焦', icon: '🎯' },
+    { k: '口误标记', icon: '🔍' },
   ].map(({ k, icon }) => {
     const m = evalText.match(new RegExp(`\\*\\*${k}\\*\\*[：:]([\\s\\S]*?)(?=\\*\\*|$)`));
     return m ? { k, icon, text: m[1].trim() } : null;
@@ -2350,6 +2353,14 @@ async function evaluate() {
     ? '【发言内容（语音转写，含标点）】'
     : '【发言内容（语音转写，无标点——请根据语义自行断句评估）】';
 
+  // 使用高精度 ASR 时，口误/磕巴会被如实记录，需要专项标注
+  const asrAccurateNote = hasPunctuation
+    ? '\n注意：本次转写由高精度 ASR 完成，文本已如实记录口误、重复字、磕巴，请在评估中重点关注这些问题。'
+    : '';
+  const slipSection = hasPunctuation
+    ? '\n**口误标记**：[逐一列出转写中明显的口误，包括：①说错立刻自我纠正（如「时动生动」中「时动」是口误）、②重复字词（如「我我觉得」）、③明显磕巴；格式：「原文片段」→ 简述问题；无则填"无"]'
+    : '';
+
   let prompt;
   if (mode === 'word') {
     // ── 词语串联模式 ──
@@ -2359,7 +2370,7 @@ async function evaluate() {
     const coverRate = words.length ? Math.round(coveredWords.length / words.length * 100) : 0;
     const coverNote = missedWords.length === 0 ? '✓全部覆盖' : `⚠️未覆盖：${missedWords.join('、')}`;
 
-    prompt = `你是口才训练教练，正在评估一位以央视主持人大赛为目标的学员。本次为【词语串联】专项训练。
+    prompt = `你是口才训练教练，正在评估一位以央视主持人大赛为目标的学员。本次为【词语串联】专项训练。${asrAccurateNote}
 
 【指定词语】${wordList}（共${words.length}个）
 
@@ -2388,8 +2399,9 @@ ${transcriptLabel}
 **逻辑结构**：[有无完整的观点-论据-升华，衔接是否流畅]
 **语言流畅度**：[结合口头禅和停顿数据评价，停顿过多或有长停顿须指出]
 **本次亮点**：[最精彩的一句，直接引用原文]
-**明日聚焦**：[下次串联可尝试的一个具体技巧]
+**明日聚焦**：[下次串联可尝试的一个具体技巧]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
+**评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]`;
   } else if (mode === 'story') {
     // ── 讲故事模式 ──
@@ -2398,7 +2410,7 @@ ${transcriptLabel}
     const titlePart = S.storyTitle ? `《${S.storyTitle}》` : '（未指定名称）';
     const storyDurationNote = duration < 120 ? '⚠️偏短' : duration > 360 ? '略长' : '✓达标';
 
-    prompt = `你是口才训练教练，正在评估一位学员的「讲故事」口头表达能力。本次学员讲述的是一个${catName}故事：${titlePart}。
+    prompt = `你是口才训练教练，正在评估一位学员的「讲故事」口头表达能力。本次学员讲述的是一个${catName}故事：${titlePart}。${asrAccurateNote}
 
 【客观数据——评分必须与之一致】
 - 发言时长：${dur}（${storyDurationNote}，目标 120-300 秒）
@@ -2424,12 +2436,13 @@ ${transcriptLabel}
 **细节生动性**：[有无具体画面、细节或情感描写？是否流于抽象概括]
 **语言流畅度**：[结合口头禅和停顿数据评价，节奏是否自然]
 **本次亮点**：[最精彩的一句，直接引用原文]
-**明日聚焦**：[下次讲故事最应加强的一点，给出具体做法]
+**明日聚焦**：[下次讲故事最应加强的一点，给出具体做法]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
+**评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]`;
   } else {
     // ── 普通题目模式 ──
-    prompt = `你是口才训练教练，正在评估一位以央视主持人大赛为目标的学员。
+    prompt = `你是口才训练教练，正在评估一位以央视主持人大赛为目标的学员。${asrAccurateNote}
 
 【题目】「${topic.text}」（主题：${topic.theme}）
 
@@ -2457,8 +2470,9 @@ ${transcriptLabel}
 **逻辑结构**：[有无观点-论据-升华层次，结构是否完整]
 **语言流畅度**：[结合口头禅和停顿数据评价，口头禅点名，长停顿须指出]
 **本次亮点**：[最精彩的一句，直接引用原文]
-**明日聚焦**：[最应改进的一点，给出具体做法]
+**明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
+**评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]`;
   }
 
@@ -2482,6 +2496,7 @@ ${transcriptLabel}
       words: mode === 'word' ? words : undefined,
       storyTitle: mode === 'story' ? S.storyTitle : undefined,
       storyCategory: mode === 'story' ? S.storyCategory : undefined,
+      asrType: S.asrType || 'browser',
       duration,
       transcript: S.transcript,
       evaluation: evalText,
@@ -2507,6 +2522,14 @@ function showResult(session, evalText) {
   document.getElementById('res-score').textContent = session.score;
   document.getElementById('res-meta').textContent =
     `${session.date} · ${Math.floor(session.duration/60)}分${session.duration%60}秒 · 连续${S.streak}天`;
+  const reasonM = evalText.match(/\*\*评分理由\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
+  const reasonEl = document.getElementById('res-score-reason');
+  if (reasonM) {
+    reasonEl.textContent = reasonM[1].trim();
+    reasonEl.style.display = 'block';
+  } else {
+    reasonEl.style.display = 'none';
+  }
   document.getElementById('res-topic-display').innerHTML =
     `<div class="label" style="margin-bottom:6px;">${session.theme}</div>
      <div style="font-size:15px;font-weight:500;line-height:1.5;">${session.topic}</div>`;
@@ -2571,6 +2594,7 @@ function showResult(session, evalText) {
   }
 
   // ── AI 评估 ──
+  const slipSect = session.asrType === 'api' ? [{ k: '口误标记', icon: '🔍' }] : [];
   const sects = session.mode === 'story'
     ? [
       { k: '叙事结构', icon: '📖' },
@@ -2578,12 +2602,14 @@ function showResult(session, evalText) {
       { k: '语言流畅度', icon: '🗣' },
       { k: '本次亮点', icon: '✨' },
       { k: '明日聚焦', icon: '🎯' },
+      ...slipSect,
     ]
     : [
       { k: '逻辑结构', icon: '🧩' },
       { k: '语言流畅度', icon: '🗣' },
       { k: '本次亮点', icon: '✨' },
       { k: '明日聚焦', icon: '🎯' },
+      ...slipSect,
     ];
   const cont = document.getElementById('res-evals');
   cont.innerHTML = '';
