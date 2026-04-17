@@ -530,8 +530,8 @@ input:focus { outline: none; border-color: var(--gold); }
 <!-- ═══ EVALUATING ═══ -->
 <div id="s-eval" class="screen flex col center gap-16">
   <div class="spin"></div>
-  <div style="font-size:17px; font-weight:500;">AI 正在评估……</div>
-  <div class="muted">分析逻辑结构与表达流畅度</div>
+  <div style="font-size:17px; font-weight:500;" id="eval-status">AI 正在评估……</div>
+  <div class="muted" id="eval-sub">分析逻辑结构与表达流畅度</div>
 </div>
 
 <!-- ═══ RESULT ═══ -->
@@ -685,6 +685,35 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="label">模型名称</div>
     <input type="text" id="cfg-model" placeholder="claude-haiku-4-5" autocomplete="off"/>
     <div class="hint" id="model-hint" style="font-size:12px; line-height:1.6;"></div>
+  </div>
+
+  <!-- ASR 语音识别 -->
+  <div class="flex col gap-8">
+    <div class="label">语音识别方式</div>
+    <div class="flex gap-8">
+      <button id="asr-type-browser" class="type-btn" onclick="setAsrType('browser')">浏览器内置</button>
+      <button id="asr-type-api" class="type-btn" onclick="setAsrType('api')">API识别（更准）</button>
+    </div>
+    <div id="asr-fields" class="flex col gap-12" style="display:none;">
+      <div class="flex gap-8" style="flex-wrap:wrap;">
+        <button class="preset-btn" onclick="fillAsrPreset('siliconflow')">SiliconFlow</button>
+      </div>
+      <div class="flex col gap-6">
+        <div class="label" style="font-size:10px;">ASR 地址</div>
+        <input type="text" id="cfg-asr-url" placeholder="https://api.siliconflow.cn/v1" autocomplete="off"/>
+      </div>
+      <div class="flex col gap-6">
+        <div class="label" style="font-size:10px;">ASR Key <span class="muted" style="font-size:10px;text-transform:none;letter-spacing:0;font-weight:400;">（留空则复用上方 Key）</span></div>
+        <input type="password" id="cfg-asr-key" placeholder="留空则复用上方 API Key" autocomplete="off"/>
+      </div>
+      <div class="flex col gap-6">
+        <div class="label" style="font-size:10px;">模型</div>
+        <input type="text" id="cfg-asr-model" placeholder="FunAudioLLM/SenseVoiceSmall" autocomplete="off"/>
+      </div>
+      <div class="hint" style="font-size:12px; line-height:1.65;">
+        推荐 <strong style="color:var(--text);">SiliconFlow + SenseVoiceSmall</strong>：中文识别准确，自动加标点，国内服务稳定。注册即有免费额度。
+      </div>
+    </div>
   </div>
 
   <!-- 词语串联词数 -->
@@ -985,6 +1014,10 @@ let S = {
   pauseThresh: parseInt(ls('pause_thresh') || '1000', 10),
   pausePenalty: parseInt(ls('pause_penalty') || '4000', 10),
   prepTime: parseInt(ls('prep_time') || '30', 10),
+  asrType: ls('asr_type') || 'browser',  // 'browser' | 'api'
+  asrUrl:  ls('asr_url')  || '',
+  asrKey:  ls('asr_key')  || '',
+  asrModel:ls('asr_model')|| '',
   mode: 'topic',       // 'topic' | 'word' | 'story'
   wordCount: parseInt(ls('word_count') || '3', 10),
   words: [],           // current selected words
@@ -1536,6 +1569,10 @@ function goSettings() {
   updatePauseThreshChips(S.pauseThresh);
   document.getElementById('cfg-pause-penalty').value = S.pausePenalty;
   updatePausePenaltyChips(S.pausePenalty);
+  setAsrType(S.asrType || 'browser');
+  document.getElementById('cfg-asr-url').value = S.asrUrl || '';
+  document.getElementById('cfg-asr-key').value = S.asrKey || '';
+  document.getElementById('cfg-asr-model').value = S.asrModel || '';
   show('s-settings');
 }
 
@@ -1555,6 +1592,44 @@ function setApiType(type) {
   if (type === 'anthropic' && !document.getElementById('cfg-model').value) {
     document.getElementById('cfg-model').value = 'claude-haiku-4-5';
   }
+}
+
+function setAsrType(type) {
+  S.asrType = type;
+  document.getElementById('asr-type-browser').classList.toggle('active', type === 'browser');
+  document.getElementById('asr-type-api').classList.toggle('active', type === 'api');
+  document.getElementById('asr-fields').style.display = type === 'api' ? 'flex' : 'none';
+}
+
+function fillAsrPreset(name) {
+  if (name === 'siliconflow') {
+    document.getElementById('cfg-asr-url').value = 'https://api.siliconflow.cn/v1';
+    document.getElementById('cfg-asr-model').value = 'FunAudioLLM/SenseVoiceSmall';
+  }
+}
+
+async function transcribeAudio(blob) {
+  const baseUrl = (S.asrUrl || '').replace(/\/$/, '');
+  const key = S.asrKey || S.apiKey;
+  const model = S.asrModel || 'FunAudioLLM/SenseVoiceSmall';
+  const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('webm') ? 'webm' : 'wav';
+
+  const form = new FormData();
+  form.append('file', blob, `audio.${ext}`);
+  form.append('model', model);
+  form.append('language', 'zh');
+
+  const resp = await fetch(`${baseUrl}/audio/transcriptions`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${key}` },
+    body: form,
+  });
+  if (!resp.ok) {
+    const msg = await resp.text().catch(() => resp.status);
+    throw new Error(`ASR 接口错误 ${resp.status}: ${msg}`);
+  }
+  const data = await resp.json();
+  return (data.text || '').trim();
 }
 
 function fillPreset(name) {
@@ -1588,6 +1663,12 @@ function saveSettings() {
   const penalty = parseInt(document.getElementById('cfg-pause-penalty').value || '4000', 10);
   S.pausePenalty = isNaN(penalty) ? 4000 : Math.min(10000, Math.max(1000, penalty));
   ls('pause_penalty', S.pausePenalty);
+  const asrUrl = document.getElementById('cfg-asr-url').value.trim().replace(/\/$/, '');
+  const asrKey = document.getElementById('cfg-asr-key').value.trim();
+  const asrModel = document.getElementById('cfg-asr-model').value.trim();
+  if (S.asrType === 'api' && !asrUrl) { alert('请填写 ASR 地址'); return; }
+  S.asrUrl = asrUrl; S.asrKey = asrKey; S.asrModel = asrModel;
+  ls('asr_type', S.asrType); ls('asr_url', asrUrl); ls('asr_key', asrKey); ls('asr_model', asrModel);
   goHome();
 }
 
@@ -2108,6 +2189,24 @@ async function stopRec() {
   }
   S.audioMetrics = realtimeMetrics;
 
+  if (S.asrType === 'api' && audioBlob) {
+    // API 转写模式：用音频文件换取带标点的准确文本
+    document.getElementById('eval-status').textContent = '正在识别语音……';
+    document.getElementById('eval-sub').textContent = '调用 ASR 接口转写中，请稍候';
+    show('s-eval');
+    try {
+      const apiText = await transcribeAudio(audioBlob);
+      if (apiText) S.transcript = apiText;
+    } catch(e) {
+      console.warn('ASR API failed, falling back to Web Speech transcript:', e.message);
+    }
+    document.getElementById('eval-status').textContent = 'AI 正在评估……';
+    document.getElementById('eval-sub').textContent = '分析逻辑结构与表达流畅度';
+    evaluate();
+    return;
+  }
+
+  // 浏览器识别模式（原有逻辑）
   if (!S.transcript.trim()) {
     if (S.noSR) {
       document.getElementById('manual-tx').value = '';
@@ -2223,6 +2322,7 @@ async function evaluate() {
   const { topic, words, mode, transcript, duration, audioMetrics } = S;
   const mins = Math.floor(duration / 60), secs = duration % 60;
   const dur = `${mins}分${secs}秒`;
+  const hasPunctuation = S.asrType === 'api';
 
   const tm = analyzeTranscript(transcript, duration);
 
@@ -2246,6 +2346,10 @@ async function evaluate() {
 - 音量变化指数：${audioMetrics.volumeCV}（${volNote}，0=完全单调）`;
   }
 
+  const transcriptLabel = hasPunctuation
+    ? '【发言内容（语音转写，含标点）】'
+    : '【发言内容（语音转写，无标点——请根据语义自行断句评估）】';
+
   let prompt;
   if (mode === 'word') {
     // ── 词语串联模式 ──
@@ -2268,7 +2372,7 @@ async function evaluate() {
 - 词语覆盖率：${coverRate}%（${coverNote}）
 ${audioSection}
 
-【发言内容（语音转写）】
+${transcriptLabel}
 「${transcript || '（未能获取转写内容）'}」
 
 【评分标准——严格参照，不得虚高】
@@ -2304,7 +2408,7 @@ ${audioSection}
 - 重复词次数：${tm.totalRepeats} 次（${repeatDetail}）
 ${audioSection}
 
-【发言内容（语音转写）】
+${transcriptLabel}
 「${transcript || '（未能获取转写内容）'}」
 
 【评分标准——聚焦叙事能力，严格参照，不得虚高】
@@ -2338,7 +2442,7 @@ ${audioSection}
 - 句子数：${tm.sentences} 句
 ${audioSection}
 
-【发言内容（语音转写）】
+${transcriptLabel}
 「${transcript || '（未能获取转写内容）'}」
 
 【评分标准——严格参照，不得虚高】
