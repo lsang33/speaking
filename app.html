@@ -365,8 +365,9 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
     <div class="flex gap-8">
       <button class="btn btn-ghost" onclick="goWordReady()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">词语串联</button>
-      <button class="btn btn-gold" onclick="goReady()" style="flex:1.5;">开始练习</button>
+      <button class="btn btn-ghost" onclick="goStorySetup()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">讲故事</button>
     </div>
+    <button class="btn btn-gold" onclick="goReady()">开始练习</button>
   </div>
 </div>
 
@@ -438,6 +439,52 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
 </div>
 
+<!-- ═══ STORY SETUP ═══ -->
+<div id="s-story-setup" class="screen flex col gap-18">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
+  </div>
+
+  <div>
+    <div class="label">讲故事</div>
+    <p class="muted" style="margin-top:6px; font-size:13px;">把看过的书、电影或亲身经历，讲成一个完整的故事，训练叙事表达能力</p>
+  </div>
+
+  <div class="flex col gap-10">
+    <div class="label">类型</div>
+    <div class="flex gap-8" style="flex-wrap:wrap;" id="story-cat-btns">
+      <button class="type-btn active" onclick="setStoryCat('movie',this)">电影</button>
+      <button class="type-btn" onclick="setStoryCat('book',this)">书籍</button>
+      <button class="type-btn" onclick="setStoryCat('experience',this)">亲身经历</button>
+      <button class="type-btn" onclick="setStoryCat('news',this)">新闻事件</button>
+    </div>
+  </div>
+
+  <div class="flex col gap-10">
+    <label class="label" for="story-title-input">名称 <span class="muted" style="font-size:11px;text-transform:none;letter-spacing:0;font-weight:400;">(选填)</span></label>
+    <input type="text" id="story-title-input" placeholder="例如：肖申克的救赎" autocomplete="off" maxlength="40"
+      onfocus="cancelPrepTimer()" onblur="startStoryPrepTimer()"/>
+  </div>
+
+  <div class="hint" style="font-size:13px; line-height:1.9;">
+    <strong style="color:var(--text);">📖 叙事结构参考</strong><br>
+    · <strong style="color:var(--text);">背景</strong>：时间、地点、主角是谁<br>
+    · <strong style="color:var(--text);">冲突</strong>：发生了什么、遇到了什么困难<br>
+    · <strong style="color:var(--text);">转折</strong>：关键时刻，情节如何发展<br>
+    · <strong style="color:var(--text);">结局</strong>：结果如何，对你有什么触动
+  </div>
+
+  <div class="mt-auto flex col gap-10">
+    <div id="story-prep-timer-box" style="display:none; text-align:center; padding:10px 0 4px;">
+      <div style="font-size:13px; color:var(--muted); margin-bottom:4px;">准备时间剩余</div>
+      <div style="font-size:56px; font-weight:200; color:var(--gold); font-variant-numeric:tabular-nums; line-height:1;" id="story-prep-num">30</div>
+      <div style="font-size:12px; color:var(--muted); margin-top:6px;">倒计时结束后自动开始</div>
+    </div>
+    <button class="btn btn-gold" id="story-start-btn" onclick="startCountdown()">准备好了，开始录音</button>
+    <button class="btn btn-ghost" id="story-skip-btn" style="display:none; font-size:14px;" onclick="skipPrepTimer()">跳过准备，直接开始</button>
+  </div>
+</div>
+
 <!-- ═══ COUNTDOWN ═══ -->
 <div id="s-countdown" class="screen flex col center gap-12">
   <div class="muted">深呼吸，放松开口</div>
@@ -450,7 +497,7 @@ input:focus { outline: none; border-color: var(--gold); }
   <div class="flex" style="align-items:center; gap:10px; padding-top:4px;">
     <div class="rec"></div>
     <span style="font-size:13px; color:var(--red); font-weight:600;">录音中</span>
-    <span class="muted" style="margin-left:auto; font-size:13px;">目标 2-3 分钟</span>
+    <span class="muted" style="margin-left:auto; font-size:13px;" id="rec-target-hint">目标 2-3 分钟</span>
   </div>
 
   <div style="text-align:center; padding:16px 0;">
@@ -512,7 +559,7 @@ input:focus { outline: none; border-color: var(--gold); }
   <div style="background:var(--card); border-radius:var(--r); padding:16px; text-align:center; font-size:15px; font-weight:500; color:var(--gold); line-height:1.6;" id="res-cheer"></div>
 
   <!-- 示范参考 -->
-  <div class="example-section">
+  <div class="example-section" id="example-section">
     <button class="btn btn-ghost" id="example-btn" onclick="openExample()" style="width:100%;">生成示范</button>
     <div id="example-expanded" style="display:none;">
       <div class="flex gap-6" id="example-style-chips" style="flex-wrap:wrap; margin:12px 0 4px;">
@@ -938,10 +985,12 @@ let S = {
   pauseThresh: parseInt(ls('pause_thresh') || '1000', 10),
   pausePenalty: parseInt(ls('pause_penalty') || '4000', 10),
   prepTime: parseInt(ls('prep_time') || '30', 10),
-  mode: 'topic',       // 'topic' | 'word'
+  mode: 'topic',       // 'topic' | 'word' | 'story'
   wordCount: parseInt(ls('word_count') || '3', 10),
   words: [],           // current selected words
   topic: null,
+  storyCategory: 'movie',
+  storyTitle: '',
   isRecording: false,
   recognition: null,
   mediaRecorder: null,
@@ -1209,6 +1258,8 @@ function setHistFilter(theme) {
 function parseEvalSections(evalText) {
   if (!evalText) return [];
   return [
+    { k: '叙事结构', icon: '📖' },
+    { k: '细节生动性', icon: '🎨' },
     { k: '逻辑结构', icon: '🧩' },
     { k: '语言流畅度', icon: '🗣' },
     { k: '本次亮点', icon: '✨' },
@@ -1664,6 +1715,53 @@ function renderWordReady() {
   ).join('');
 }
 
+function goStorySetup() {
+  S.mode = 'story';
+  S.storyCategory = 'movie';
+  S.storyTitle = '';
+  document.querySelectorAll('#story-cat-btns .type-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+  document.getElementById('story-title-input').value = '';
+  show('s-story-setup');
+  startStoryPrepTimer();
+}
+
+function setStoryCat(cat, btn) {
+  S.storyCategory = cat;
+  document.querySelectorAll('#story-cat-btns .type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function startStoryPrepTimer() {
+  cancelPrepTimer();
+  const total = S.prepTime || 0;
+  const box = document.getElementById('story-prep-timer-box');
+  const numEl = document.getElementById('story-prep-num');
+  const skipBtn = document.getElementById('story-skip-btn');
+  const startBtn = document.getElementById('story-start-btn');
+
+  if (total <= 0) {
+    box.style.display = 'none';
+    skipBtn.style.display = 'none';
+    startBtn.textContent = '准备好了，开始录音';
+    return;
+  }
+
+  let remaining = total;
+  numEl.textContent = remaining;
+  box.style.display = 'block';
+  skipBtn.style.display = 'block';
+  startBtn.textContent = '现在开始录音';
+
+  S.prepTimerRef = setInterval(() => {
+    remaining--;
+    numEl.textContent = remaining;
+    if (remaining <= 0) {
+      cancelPrepTimer();
+      startCountdown();
+    }
+  }, 1000);
+}
+
 function startWordPrepTimer() {
   cancelPrepTimer();
   const total = S.prepTime || 0;
@@ -1808,6 +1906,9 @@ function skipPrepTimer() {
 ═══════════════════════════════════════ */
 function startCountdown() {
   cancelPrepTimer();
+  if (S.mode === 'story') {
+    S.storyTitle = document.getElementById('story-title-input').value.trim();
+  }
   show('s-countdown');
   let n = 3;
   const tips = ['想好开头第一句', '深呼吸', '开口！'];
@@ -1942,6 +2043,7 @@ function beginRecording() {
   document.getElementById('tx-text').style.color = 'var(--muted)';
   document.getElementById('no-sr-hint').style.display = 'none';
   renderRecWordChips();
+  document.getElementById('rec-target-hint').textContent = S.mode === 'story' ? '目标 3-5 分钟' : '目标 2-3 分钟';
   show('s-rec');
 
   S.timerRef = setInterval(() => {
@@ -2185,6 +2287,42 @@ ${audioSection}
 **明日聚焦**：[下次串联可尝试的一个具体技巧]
 **评分**：[X/10，整数，必须与客观数据一致]
 **鼓励**：[一句话，不超过15字]`;
+  } else if (mode === 'story') {
+    // ── 讲故事模式 ──
+    const catNameMap = { movie: '电影', book: '书籍', experience: '亲身经历', news: '新闻事件' };
+    const catName = catNameMap[S.storyCategory] || '故事';
+    const titlePart = S.storyTitle ? `《${S.storyTitle}》` : '（未指定名称）';
+    const storyDurationNote = duration < 120 ? '⚠️偏短' : duration > 360 ? '略长' : '✓达标';
+
+    prompt = `你是口才训练教练，正在评估一位学员的「讲故事」口头表达能力。本次学员讲述的是一个${catName}故事：${titlePart}。
+
+【客观数据——评分必须与之一致】
+- 发言时长：${dur}（${storyDurationNote}，目标 120-300 秒）
+- 有效字数：${tm.chars} 字
+- 语速：${tm.pace} 字/分钟（${paceNote}，正常范围 200-270）
+- 口头禅次数：${tm.totalFillers} 次（${fillerDetail}）
+- 重复词次数：${tm.totalRepeats} 次（${repeatDetail}）
+${audioSection}
+
+【发言内容（语音转写）】
+「${transcript || '（未能获取转写内容）'}」
+
+【评分标准——聚焦叙事能力，严格参照，不得虚高】
+9-10分：叙事四要素完整（背景/冲突/转折/结局），有具体细节和画面感，情节有起伏，语言流畅自然，时长达标
+7-8分：结构基本完整，有一定细节，情节能讲清楚，口头禅≤2次，无明显卡顿
+5-6分：能讲完故事但偏流水账，缺少转折或细节描写，或时长不足120秒，或口头禅3-5次
+3-4分：结构混乱，情节不完整，细节极少，或口头禅≥6次，或卡顿严重
+1-2分：内容极少，无法形成完整故事
+
+【输出格式——严格按此，每项不超过2句】
+
+**叙事结构**：[背景/冲突/转折/结局四要素是否完整？哪个环节最弱]
+**细节生动性**：[有无具体画面、细节或情感描写？是否流于抽象概括]
+**语言流畅度**：[结合口头禅和停顿数据评价，节奏是否自然]
+**本次亮点**：[最精彩的一句，直接引用原文]
+**明日聚焦**：[下次讲故事最应加强的一点，给出具体做法]
+**评分**：[X/10，整数，必须与客观数据一致]
+**鼓励**：[一句话，不超过15字]`;
   } else {
     // ── 普通题目模式 ──
     prompt = `你是口才训练教练，正在评估一位以央视主持人大赛为目标的学员。
@@ -2233,9 +2371,13 @@ ${audioSection}
       id: S.sessionId,
       date: today(),
       mode: mode || 'topic',
-      topic: mode === 'word' ? `词语串联：${words.join('、')}` : topic.text,
-      theme: mode === 'word' ? '词语串联' : topic.theme,
+      topic: mode === 'word' ? `词语串联：${words.join('、')}`
+           : mode === 'story' ? (S.storyTitle || `${({movie:'电影',book:'书籍',experience:'亲身经历',news:'新闻事件'}[S.storyCategory]||'故事')}`)
+           : topic.text,
+      theme: mode === 'word' ? '词语串联' : mode === 'story' ? '讲故事' : topic.theme,
       words: mode === 'word' ? words : undefined,
+      storyTitle: mode === 'story' ? S.storyTitle : undefined,
+      storyCategory: mode === 'story' ? S.storyCategory : undefined,
       duration,
       transcript: S.transcript,
       evaluation: evalText,
@@ -2325,12 +2467,20 @@ function showResult(session, evalText) {
   }
 
   // ── AI 评估 ──
-  const sects = [
-    { k: '逻辑结构', icon: '🧩' },
-    { k: '语言流畅度', icon: '🗣' },
-    { k: '本次亮点', icon: '✨' },
-    { k: '明日聚焦', icon: '🎯' },
-  ];
+  const sects = session.mode === 'story'
+    ? [
+      { k: '叙事结构', icon: '📖' },
+      { k: '细节生动性', icon: '🎨' },
+      { k: '语言流畅度', icon: '🗣' },
+      { k: '本次亮点', icon: '✨' },
+      { k: '明日聚焦', icon: '🎯' },
+    ]
+    : [
+      { k: '逻辑结构', icon: '🧩' },
+      { k: '语言流畅度', icon: '🗣' },
+      { k: '本次亮点', icon: '✨' },
+      { k: '明日聚焦', icon: '🎯' },
+    ];
   const cont = document.getElementById('res-evals');
   cont.innerHTML = '';
   sects.forEach(({ k, icon }) => {
@@ -2349,13 +2499,14 @@ function showResult(session, evalText) {
   document.getElementById('debug-panel').style.display = 'none';
   document.getElementById('debug-btn').style.color = 'var(--muted)';
 
-  // 重置示范参考区
+  // 重置示范参考区（故事模式不显示）
   _exStyle = 'natural';
   document.querySelectorAll('#example-style-chips .preset-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
   document.getElementById('example-expanded').style.display = 'none';
   document.getElementById('example-output').style.display = 'none';
   document.getElementById('example-loading').style.display = 'none';
   document.getElementById('example-btn').style.display = 'block';
+  document.getElementById('example-section').style.display = session.mode === 'story' ? 'none' : 'block';
 
   show('s-result');
 }
