@@ -134,7 +134,7 @@ input:focus { outline: none; border-color: var(--gold); }
 .stat-l { font-size: 11px; color: var(--muted); margin-top: 4px; }
 .filter-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .filter-bar::-webkit-scrollbar { display: none; }
-#topics-tab-bar { overflow-x: visible; flex-wrap: wrap; padding-bottom: 4px; }
+#topics-tab-bar { overflow-x: visible; flex-wrap: wrap; padding-bottom: 8px; position: sticky; top: 0; background: var(--bg); z-index: 10; padding-top: 6px; margin: -6px -20px 0; padding-left: 20px; padding-right: 20px; }
 .filter-btn {
   flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
   border: none; font-size: 13px; cursor: pointer;
@@ -375,7 +375,7 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
     <div class="flex gap-8">
       <button class="btn btn-ghost" onclick="goWordReady()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">词语串联</button>
-      <button class="btn btn-ghost" onclick="goStorySetup()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">讲故事</button>
+      <button class="btn btn-ghost" onclick="goStorySetup()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">讲述模式</button>
     </div>
   </div>
 </div>
@@ -457,7 +457,7 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
 
   <div>
-    <div class="label">讲故事</div>
+    <div class="label">讲述模式</div>
     <p class="muted" style="margin-top:6px; font-size:13px;">把看过的书、电影或亲身经历，讲成一个完整的故事，训练叙事表达能力</p>
   </div>
 
@@ -616,12 +616,10 @@ input:focus { outline: none; border-color: var(--gold); }
 
 <!-- ═══ HISTORY ═══ -->
 <div id="s-history" class="screen flex col gap-14">
-  <div>
-    <div style="display:flex; align-items:center; justify-content:space-between;">
-      <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
-      <button id="hist-export-btn" class="btn btn-ghost btn-sm" onclick="exportBatch()" style="color:var(--gold);">导出录音</button>
-    </div>
-    <h2 style="margin-top:14px;">练习归档</h2>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
+    <div style="flex:1;"></div>
+    <button id="hist-export-btn" class="btn btn-ghost btn-sm" onclick="exportBatch()" style="color:var(--gold);">导出录音</button>
   </div>
 
   <!-- 月历打卡 -->
@@ -639,7 +637,6 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <!-- 折线图 -->
   <div id="hist-chart-wrap" style="display:none;">
-    <div class="label" style="margin-bottom:8px;">分数趋势（最近 20 次）</div>
     <svg id="hist-chart" width="100%" height="72" style="display:block;"></svg>
   </div>
 
@@ -873,6 +870,7 @@ input:focus { outline: none; border-color: var(--gold); }
 </div>
 
 <script src="topics.js"></script>
+<script src="words.js"></script>
 <script>
 /* ═══════════════════════════════════════
    APP
@@ -1103,16 +1101,6 @@ function loadFavorites() {
   try { return new Set(JSON.parse(ls('favorites') || '[]')); } catch(e) { return new Set(); }
 }
 function saveFavorites(set) { ls('favorites', JSON.stringify([...set])); }
-function toggleFavorite(text, event) {
-  event.stopPropagation();
-  const favs = loadFavorites();
-  if (favs.has(text)) favs.delete(text); else favs.add(text);
-  saveFavorites(favs);
-  const el = document.getElementById('s-topics');
-  const scrollTop = el ? el.scrollTop : 0;
-  renderTopicsPage();
-  requestAnimationFrame(() => { if (el) el.scrollTop = scrollTop; });
-}
 function startFavoriteTopic(text) {
   const bt = TOPICS.find(t => t.text === text);
   if (bt) { S.topic = bt; S.mode = 'topic'; goReady(); return; }
@@ -1155,14 +1143,14 @@ function randomTopic() {
 }
 
 function recommendTopic() {
-  const pool = allTopics().filter(t => t.theme && t.theme !== '词语串联' && t.theme !== '讲故事');
+  const pool = allTopics().filter(t => t.theme && t.theme !== '词语串联' && t.theme !== '讲述模式');
   const practiced = practicedTopicSet();
   const totalPracticed = practiced.size;
 
   // 统计各主题的历史平均分
   const themeStats = {};
   allSessions.forEach(s => {
-    if (!s.theme || s.theme === '词语串联' || s.theme === '讲故事') return;
+    if (!s.theme || s.theme === '词语串联' || s.theme === '讲述模式') return;
     if (!themeStats[s.theme]) themeStats[s.theme] = { count: 0, sum: 0 };
     const sc = parseInt(s.score);
     if (!isNaN(sc)) { themeStats[s.theme].sum += sc; themeStats[s.theme].count++; }
@@ -1857,27 +1845,7 @@ async function callLLM(prompt, maxTokens = 800) {
 /* ═══════════════════════════════════════
    WORD BANK
 ═══════════════════════════════════════ */
-const WORD_BANK = [
-  // 日常物件
-  '镜子','钥匙','闹钟','书包','雨伞','枕头','茶杯','手表','眼镜','信封','台灯','窗帘',
-  // 自然
-  '彩虹','落叶','星空','海浪','清晨','暮色','月光','微风','雪花','瀑布','山顶','霜',
-  '潮汐','晨雾','闪电','泥土','松针','苔藓',
-  // 情感与抽象
-  '勇气','遗忘','期待','孤独','温暖','自由','梦想','执着','释然','迷茫','好奇','敬畏',
-  '坚持','包容','脆弱','侥幸','沉默','依赖','嫉妒','感激','羞涩','共鸣',
-  // 动作与状态
-  '奔跑','等待','告别','重逢','迷路','突破','转身','停留','回望','聆听','漂泊','蛰伏',
-  // 人与关系
-  '陌生人','老友','导师','对手','旁观者','引路人',
-  // 社会与概念
-  '边界','规则','机遇','代价','转折','选择','习惯','节奏','痕迹','距离','时机','根基',
-  '门槛','筛子','底线','锚点','余地','缺口','回声','惯性',
-  // 场景与地点
-  '街角','车站','操场','屋顶','地铁','咖啡馆','海边','山路','图书馆','废墟','渡口',
-  // 物象与隐喻
-  '地图','灯塔','种子','碎片','线索','桥梁','齿轮','密码','罗盘','镜像','沙漏','棱镜',
-];
+// WORD_BANK 已移至 words.js
 
 function drawWords(n) {
   const pool = [...WORD_BANK];
@@ -2531,13 +2499,13 @@ ${transcriptLabel}
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]`;
   } else if (mode === 'story') {
-    // ── 讲故事模式 ──
+    // ── 讲述模式模式 ──
     const catNameMap = { movie: '电影', book: '书籍', experience: '亲身经历', news: '新闻事件' };
     const catName = catNameMap[S.storyCategory] || '故事';
     const titlePart = S.storyTitle ? `《${S.storyTitle}》` : '（未指定名称）';
     const storyDurationNote = duration < 120 ? '⚠️偏短' : duration > 360 ? '略长' : '✓达标';
 
-    prompt = `你是口才训练教练，正在评估一位学员的「讲故事」口头表达能力。本次学员讲述的是一个${catName}故事：${titlePart}。${asrAccurateNote}
+    prompt = `你是口才训练教练，正在评估一位学员的「讲述模式」口头表达能力。本次学员讲述的是一个${catName}故事：${titlePart}。${asrAccurateNote}
 
 【客观数据——评分必须与之一致】
 - 发言时长：${dur}（${storyDurationNote}，目标 120-300 秒）
@@ -2563,7 +2531,7 @@ ${transcriptLabel}
 **细节生动性**：[有无具体画面、细节或情感描写？是否流于抽象概括]
 **语言流畅度**：[结合口头禅和停顿数据评价，节奏是否自然]
 **本次亮点**：[最精彩的一句，直接引用原文]
-**明日聚焦**：[下次讲故事最应加强的一点，给出具体做法]${slipSection}
+**明日聚焦**：[下次讲述模式最应加强的一点，给出具体做法]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]`;
@@ -2619,7 +2587,7 @@ ${transcriptLabel}
       topic: mode === 'word' ? `词语串联：${words.join('、')}`
            : mode === 'story' ? (S.storyTitle || `${({movie:'电影',book:'书籍',experience:'亲身经历',news:'新闻事件'}[S.storyCategory]||'故事')}`)
            : topic.text,
-      theme: mode === 'word' ? '词语串联' : mode === 'story' ? '讲故事' : topic.theme,
+      theme: mode === 'word' ? '词语串联' : mode === 'story' ? '讲述模式' : topic.theme,
       words: mode === 'word' ? words : undefined,
       storyTitle: mode === 'story' ? S.storyTitle : undefined,
       storyCategory: mode === 'story' ? S.storyCategory : undefined,
@@ -3178,7 +3146,20 @@ function practicedTopicSet() {
 
 function favBtn(text, favs) {
   const on = favs.has(text);
-  return `<button class="bank-item-fav${on ? ' active' : ''}" onclick="toggleFavorite(${JSON.stringify(text)}, event)" title="${on ? '取消收藏' : '收藏'}">${on ? '★' : '☆'}</button>`;
+  const safe = text.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  return `<button class="bank-item-fav${on ? ' active' : ''}" data-fav="${safe}" onclick="handleFavBtn(this,event)" title="${on ? '取消收藏' : '收藏'}">${on ? '★' : '☆'}</button>`;
+}
+
+function handleFavBtn(btn, event) {
+  event.stopPropagation();
+  const text = btn.dataset.fav;
+  const favs = loadFavorites();
+  if (favs.has(text)) favs.delete(text); else favs.add(text);
+  saveFavorites(favs);
+  const el = document.getElementById('s-topics');
+  const scrollTop = el ? el.scrollTop : 0;
+  renderTopicsPage();
+  requestAnimationFrame(() => { if (el) el.scrollTop = scrollTop; });
 }
 
 function renderTopicsPage() {
@@ -3193,9 +3174,16 @@ function renderTopicsPage() {
     ...themes,
   ];
 
+  // 各分类题目数量
+  const themeCount = {};
+  TOPICS.forEach(t => { themeCount[t.theme] = (themeCount[t.theme] || 0) + 1; });
+  INTERVIEW_TOPICS.forEach(() => { themeCount['结构化面试'] = (themeCount['结构化面试'] || 0) + 1; });
+  customs.forEach(t => { themeCount['自定义题目'] = (themeCount['自定义题目'] || 0) + 1; });
+  if (favs.size) themeCount['收藏'] = favs.size;
+
   // 顶部标签栏
   document.getElementById('topics-tab-bar').innerHTML = tabThemes.map(th =>
-    `<button class="filter-btn" onclick="topicsScrollTo('topics-sec-${th}')">${th}</button>`
+    `<button class="filter-btn" onclick="topicsScrollTo('topics-sec-${th}')">${th}<span style="font-size:10px;opacity:.6;margin-left:3px;">${themeCount[th] || ''}</span></button>`
   ).join('');
 
   let html = '';
@@ -3219,7 +3207,7 @@ function renderTopicsPage() {
         </div>
         <div class="flex col gap-4" style="flex-shrink:0; align-items:flex-end;">
           ${favBtn(text, favs)}
-          <button class="bank-item-practice" onclick="startFavoriteTopic(${JSON.stringify(text)})">练习</button>
+          <button class="bank-item-practice" data-favtext="${text.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" onclick="startFavoriteTopic(this.dataset.favtext)">练习</button>
         </div>
       </div>`;
     }).join('');
@@ -3227,7 +3215,8 @@ function renderTopicsPage() {
 
   // ── 结构化面试独立分区 ──
   const subtypes = [...new Set(INTERVIEW_TOPICS.map(t => t.subtype))];
-  html += `<div id="topics-sec-结构化面试" class="bank-section-title" style="color:var(--gold);">结构化面试</div>`;
+  const interviewDone = INTERVIEW_TOPICS.filter(t => practiced.has(t.text)).length;
+  html += `<div id="topics-sec-结构化面试" class="bank-section-title" style="color:var(--gold);">结构化面试 <span style="font-weight:400;opacity:.6;">${interviewDone}/${INTERVIEW_TOPICS.length}</span></div>`;
   subtypes.forEach(sub => {
     html += `<div class="interview-subtype">${sub}</div>`;
     html += INTERVIEW_TOPICS.filter(t => t.subtype === sub).map((t, _) => {
@@ -3243,7 +3232,8 @@ function renderTopicsPage() {
 
   // ── 自定义题目 ──
   if (customs.length) {
-    html += `<div class="bank-section-title" id="topics-sec-自定义题目">自定义题目</div>`;
+    const customDone = customs.filter(t => practiced.has(t.text)).length;
+    html += `<div class="bank-section-title" id="topics-sec-自定义题目">自定义题目 <span style="font-weight:400;opacity:.6;">${customDone}/${customs.length}</span></div>`;
     html += customs.map((t, i) => {
       const done = practiced.has(t.text);
       return `<div class="bank-item${done ? ' practiced' : ''}">
@@ -3262,7 +3252,9 @@ function renderTopicsPage() {
 
   // ── 内置题库 ──
   themes.forEach(theme => {
-    html += `<div class="bank-section-title" id="topics-sec-${theme}">${theme}</div>`;
+    const themeTopics = TOPICS.filter(t => t.theme === theme);
+    const themeDone = themeTopics.filter(t => practiced.has(t.text)).length;
+    html += `<div class="bank-section-title" id="topics-sec-${theme}">${theme} <span style="font-weight:400;opacity:.6;">${themeDone}/${themeTopics.length}</span></div>`;
     html += TOPICS.filter(t => t.theme === theme).map(t => {
       const idx = TOPICS.indexOf(t);
       const done = practiced.has(t.text);
@@ -3304,7 +3296,11 @@ function startCustomTopic(i) {
 
 function topicsScrollTo(id) {
   const el = document.getElementById(id);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (!el) return;
+  const tabBar = document.getElementById('topics-tab-bar');
+  const offset = tabBar ? tabBar.offsetHeight + 8 : 0;
+  const top = el.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({ top, behavior: 'smooth' });
 }
 
 function showAddTopic() {
