@@ -134,6 +134,7 @@ input:focus { outline: none; border-color: var(--gold); }
 .stat-l { font-size: 11px; color: var(--muted); margin-top: 4px; }
 .filter-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .filter-bar::-webkit-scrollbar { display: none; }
+#topics-tab-bar { overflow-x: visible; flex-wrap: wrap; padding-bottom: 4px; }
 .filter-btn {
   flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
   border: none; font-size: 13px; cursor: pointer;
@@ -272,6 +273,8 @@ input:focus { outline: none; border-color: var(--gold); }
 .bank-item-del { background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; padding:2px 0; flex-shrink:0; margin-top:2px; }
 .bank-item-practice { background:none; border:1px solid #444; border-radius:6px; color:var(--muted); font-size:12px; cursor:pointer; padding:3px 10px; flex-shrink:0; margin-top:2px; transition:all .15s; }
 .bank-item-practice:active { background:var(--gold); border-color:var(--gold); color:#000; }
+.bank-item-fav { background:none; border:none; color:#555; font-size:16px; cursor:pointer; padding:2px 4px; flex-shrink:0; line-height:1; transition:color .15s; margin-top:1px; }
+.bank-item-fav.active { color:var(--gold); }
 .bank-item.practiced { opacity:.5; }
 .bank-item.practiced .bank-item-text { text-decoration-color: #555; }
 .practiced-badge { font-size:10px; color:var(--gold); opacity:.7; margin-left:6px; vertical-align:middle; }
@@ -344,9 +347,16 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
 
   <div class="topic-card" onclick="goReady()" style="cursor:pointer;">
-    <div class="label" id="h-theme"></div>
-    <div style="font-size:19px; font-weight:600; line-height:1.5; margin-top:8px;" id="h-topic"></div>
-    <div class="muted" style="margin-top:12px; font-size:13px;">点击查看详情，开始练习 →</div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span id="h-topic-mode-badge" style="font-size:10px;font-weight:700;letter-spacing:.5px;padding:2px 8px;border-radius:10px;background:rgba(212,168,67,.15);color:var(--gold);">推荐</span>
+        <span class="label" id="h-theme"></span>
+      </div>
+      <button id="h-topic-switch" onclick="switchHomeTopicMode(event)" style="background:none;border:none;font-size:12px;color:var(--muted);cursor:pointer;padding:2px 6px;">↺ 随机</button>
+    </div>
+    <div style="font-size:19px; font-weight:600; line-height:1.5;" id="h-topic"></div>
+    <div id="h-topic-reason" style="font-size:12px; color:var(--muted); margin-top:6px; min-height:16px;"></div>
+    <div class="muted" style="margin-top:10px; font-size:13px;">点击查看详情，开始练习 →</div>
   </div>
 
   <!-- 统计条 -->
@@ -367,15 +377,15 @@ input:focus { outline: none; border-color: var(--gold); }
       <button class="btn btn-ghost" onclick="goWordReady()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">词语串联</button>
       <button class="btn btn-ghost" onclick="goStorySetup()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">讲故事</button>
     </div>
-    <button class="btn btn-gold" onclick="goReady()">开始练习</button>
   </div>
 </div>
 
 <!-- ═══ READY ═══ -->
 <div id="s-ready" class="screen flex col gap-18">
-  <div style="display:flex; align-items:center; gap:12px;">
+  <div style="display:flex; align-items:center; gap:8px;">
     <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
-    <button onclick="openTopicPicker()" class="btn btn-ghost btn-sm">换题</button>
+    <button onclick="switchToRecommendTopic()" class="btn btn-ghost btn-sm" style="color:var(--gold); border-color:var(--gold);">★ 推荐</button>
+    <button onclick="openTopicPicker()" class="btn btn-ghost btn-sm">↺ 换题</button>
   </div>
 
   <div>
@@ -383,6 +393,7 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="topic-card" style="margin-top:10px;">
       <div class="label" id="r-theme"></div>
       <div style="font-size:20px; font-weight:600; line-height:1.5; margin-top:8px;" id="r-topic"></div>
+      <div id="r-topic-reason" style="display:none; font-size:12px; color:var(--muted); margin-top:6px;"></div>
     </div>
   </div>
 
@@ -1020,6 +1031,7 @@ let S = {
   asrUrl:  ls('asr_url')  || '',
   asrKey:  ls('asr_key')  || '',
   asrModel:ls('asr_model')|| '',
+  homeTopicMode: 'recommend', // 'recommend' | 'random'
   mode: 'topic',       // 'topic' | 'word' | 'story'
   wordCount: parseInt(ls('word_count') || '3', 10),
   words: [],           // current selected words
@@ -1087,6 +1099,28 @@ function loadCustomTopics() {
   try { return JSON.parse(ls('custom_topics') || '[]'); } catch(e) { return []; }
 }
 function saveCustomTopics(arr) { ls('custom_topics', JSON.stringify(arr)); }
+function loadFavorites() {
+  try { return new Set(JSON.parse(ls('favorites') || '[]')); } catch(e) { return new Set(); }
+}
+function saveFavorites(set) { ls('favorites', JSON.stringify([...set])); }
+function toggleFavorite(text, event) {
+  event.stopPropagation();
+  const favs = loadFavorites();
+  if (favs.has(text)) favs.delete(text); else favs.add(text);
+  saveFavorites(favs);
+  const el = document.getElementById('s-topics');
+  const scrollTop = el ? el.scrollTop : 0;
+  renderTopicsPage();
+  requestAnimationFrame(() => { if (el) el.scrollTop = scrollTop; });
+}
+function startFavoriteTopic(text) {
+  const bt = TOPICS.find(t => t.text === text);
+  if (bt) { S.topic = bt; S.mode = 'topic'; goReady(); return; }
+  const it = INTERVIEW_TOPICS.find(t => t.text === text);
+  if (it) { S.topic = { text: it.text, theme: '结构化面试', subtype: it.subtype, d: 2 }; S.mode = 'topic'; goReady(); return; }
+  const ct = loadCustomTopics().find(t => t.text === text);
+  if (ct) { S.topic = { text: ct.text, theme: ct.theme, d: ct.d || 2 }; S.mode = 'topic'; goReady(); }
+}
 function allTopics() { return [...TOPICS, ...loadCustomTopics()]; }
 
 function todayTopic() {
@@ -1120,19 +1154,97 @@ function randomTopic() {
   return t;
 }
 
+function recommendTopic() {
+  const pool = allTopics().filter(t => t.theme && t.theme !== '词语串联' && t.theme !== '讲故事');
+  const practiced = practicedTopicSet();
+  const totalPracticed = practiced.size;
+
+  // 统计各主题的历史平均分
+  const themeStats = {};
+  allSessions.forEach(s => {
+    if (!s.theme || s.theme === '词语串联' || s.theme === '讲故事') return;
+    if (!themeStats[s.theme]) themeStats[s.theme] = { count: 0, sum: 0 };
+    const sc = parseInt(s.score);
+    if (!isNaN(sc)) { themeStats[s.theme].sum += sc; themeStats[s.theme].count++; }
+  });
+
+  const recentThemes = allSessions.slice(0, 3).map(s => s.theme);
+
+  const candidates = pool.map(t => {
+    let score = 0;
+    const reasons = [];
+
+    // 未练过：最高权重
+    if (!practiced.has(t.text)) { score += 30; reasons.push('未练过'); }
+
+    // 难度递进
+    if (totalPracticed < 5) {
+      if (t.d === 1) { score += 20; reasons.push('难度适合入门阶段'); }
+    } else if (totalPracticed < 15) {
+      if (t.d <= 2) score += 8;
+    }
+
+    // 薄弱主题加权
+    const stat = themeStats[t.theme];
+    if (stat && stat.count > 0) {
+      const avg = stat.sum / stat.count;
+      if (avg < 7) {
+        score += Math.round((7 - avg) * 5);
+        reasons.push(`${t.theme}均分偏低（${avg.toFixed(1)}分）`);
+      }
+    }
+
+    // 未涉及的主题
+    if (!themeStats[t.theme]) { score += 12; reasons.push(`${t.theme}还未涉及`); }
+
+    // 最近练过的主题降权
+    if (recentThemes.includes(t.theme)) score -= 15;
+
+    return { topic: t, score, reason: reasons[0] || '' };
+  });
+
+  candidates.sort((a, b) => b.score - a.score);
+  // 从前3名随机选一个，避免每次完全一样
+  const pick = candidates[Math.floor(Math.random() * Math.min(3, candidates.length))];
+  return { topic: pick.topic, reason: pick.reason };
+}
+
+function renderHomeTopic() {
+  const isRec = S.homeTopicMode === 'recommend';
+  if (isRec) {
+    const { topic, reason } = recommendTopic();
+    S.topic = topic;
+    document.getElementById('h-topic-reason').textContent = reason ? `💡 ${reason}` : '';
+    document.getElementById('h-topic-mode-badge').textContent = '推荐';
+    document.getElementById('h-topic-switch').textContent = '↺ 随机';
+  } else {
+    S.topic = randomTopic();
+    document.getElementById('h-topic-reason').textContent = '';
+    document.getElementById('h-topic-mode-badge').textContent = '随机';
+    document.getElementById('h-topic-switch').textContent = '★ 推荐';
+  }
+  document.getElementById('h-theme').textContent = S.topic.theme;
+  document.getElementById('h-topic').textContent = S.topic.text;
+}
+
+function switchHomeTopicMode(e) {
+  e.stopPropagation();
+  S.homeTopicMode = S.homeTopicMode === 'recommend' ? 'random' : 'recommend';
+  renderHomeTopic();
+}
+
 function goHome() {
   cancelPrepTimer();
   S.mode = 'topic';
   S.words = [];
   computeStreak();
-  S.topic = randomTopic();
   const now = new Date();
   const days = ['日','一','二','三','四','五','六'];
   document.getElementById('h-date').textContent =
     `${now.getMonth()+1}月${now.getDate()}日 星期${days[now.getDay()]}`;
   document.getElementById('h-streak').textContent = S.streak;
-  document.getElementById('h-theme').textContent = S.topic.theme;
-  document.getElementById('h-topic').textContent = S.topic.text;
+  S.homeTopicMode = 'recommend';
+  renderHomeTopic();
 
   // 统计条
   const total = allSessions.length;
@@ -1169,12 +1281,27 @@ function goHome() {
   show('s-home');
 }
 
-function renderTopicToReady(t) {
+function renderTopicToReady(t, reason) {
   document.getElementById('r-theme').textContent = t.theme;
   document.getElementById('r-topic').textContent = t.text;
   document.getElementById('r-hint-text').innerHTML =
     (t.hint || '① 描述你看到/感受到什么\n② 联想到什么（个人/社会）\n③ 背后深意是什么，一句话总结')
       .split('\n').map(line => `· ${line.trim().replace(/^[①②③·]\s*/, '')}`).join('<br>');
+  const reasonEl = document.getElementById('r-topic-reason');
+  if (reason) {
+    reasonEl.textContent = `💡 ${reason}`;
+    reasonEl.style.display = 'block';
+  } else {
+    reasonEl.style.display = 'none';
+  }
+}
+
+function switchToRecommendTopic() {
+  const { topic, reason } = recommendTopic();
+  S.topic = topic;
+  cancelPrepTimer();
+  renderTopicToReady(topic, reason);
+  startPrepTimer();
 }
 
 function goReady() {
@@ -3049,11 +3176,18 @@ function practicedTopicSet() {
   return new Set(allSessions.map(s => s.topic));
 }
 
+function favBtn(text, favs) {
+  const on = favs.has(text);
+  return `<button class="bank-item-fav${on ? ' active' : ''}" onclick="toggleFavorite(${JSON.stringify(text)}, event)" title="${on ? '取消收藏' : '收藏'}">${on ? '★' : '☆'}</button>`;
+}
+
 function renderTopicsPage() {
   const practiced = practicedTopicSet();
+  const favs = loadFavorites();
   const customs = loadCustomTopics();
   const themes = [...new Set(TOPICS.map(t => t.theme))];
   const tabThemes = [
+    ...(favs.size ? ['收藏'] : []),
     '结构化面试',
     ...(customs.length ? ['自定义题目'] : []),
     ...themes,
@@ -3066,13 +3200,34 @@ function renderTopicsPage() {
 
   let html = '';
 
+  // ── 收藏分区 ──
+  if (favs.size) {
+    html += `<div class="bank-section-title" id="topics-sec-收藏" style="color:var(--gold);">★ 收藏（${favs.size}）</div>`;
+    const allT = [
+      ...TOPICS.map(t => ({ ...t })),
+      ...INTERVIEW_TOPICS.map(t => ({ text: t.text, theme: '结构化面试', d: 2 })),
+      ...customs,
+    ];
+    html += [...favs].map(text => {
+      const t = allT.find(x => x.text === text);
+      if (!t) return '';
+      const done = practiced.has(text);
+      return `<div class="bank-item${done ? ' practiced' : ''}">
+        <div class="bank-item-text">
+          <span class="theme-badge">${t.theme}</span>
+          <span style="display:block;margin-top:4px;">${text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
+        </div>
+        <div class="flex col gap-4" style="flex-shrink:0; align-items:flex-end;">
+          ${favBtn(text, favs)}
+          <button class="bank-item-practice" onclick="startFavoriteTopic(${JSON.stringify(text)})">练习</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
   // ── 结构化面试独立分区 ──
   const subtypes = [...new Set(INTERVIEW_TOPICS.map(t => t.subtype))];
-  html += `
-    <div id="topics-sec-结构化面试" class="interview-section-header">
-      <div style="font-size:13px;font-weight:700;color:var(--gold);">结构化面试</div>
-      <div class="muted" style="font-size:11px;margin-top:2px;">共 ${INTERVIEW_TOPICS.length} 道 · 不参与每日随机出题</div>
-    </div>`;
+  html += `<div id="topics-sec-结构化面试" class="bank-section-title" style="color:var(--gold);">结构化面试</div>`;
   subtypes.forEach(sub => {
     html += `<div class="interview-subtype">${sub}</div>`;
     html += INTERVIEW_TOPICS.filter(t => t.subtype === sub).map((t, _) => {
@@ -3080,6 +3235,7 @@ function renderTopicsPage() {
       const done = practiced.has(t.text);
       return `<div class="bank-item${done ? ' practiced' : ''}">
         <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</div>
+        ${favBtn(t.text, favs)}
         <button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>
       </div>`;
     }).join('');
@@ -3088,22 +3244,33 @@ function renderTopicsPage() {
   // ── 自定义题目 ──
   if (customs.length) {
     html += `<div class="bank-section-title" id="topics-sec-自定义题目">自定义题目</div>`;
-    html += customs.map((t, i) => `
-      <div class="bank-item">
+    html += customs.map((t, i) => {
+      const done = practiced.has(t.text);
+      return `<div class="bank-item${done ? ' practiced' : ''}">
         <div class="bank-item-text">
           <span class="theme-badge">${t.theme}</span>
-          <span style="display:block;margin-top:5px;">${t.text}</span>
+          <span style="display:block;margin-top:5px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
         </div>
-        <button class="bank-item-del" onclick="deleteCustomTopic(${i})">删除</button>
-      </div>`).join('');
+        <div class="flex col gap-4" style="flex-shrink:0; align-items:flex-end;">
+          ${favBtn(t.text, favs)}
+          <button class="bank-item-practice" onclick="startCustomTopic(${i})">练习</button>
+          <button class="bank-item-del" onclick="deleteCustomTopic(${i})">删除</button>
+        </div>
+      </div>`;
+    }).join('');
   }
 
   // ── 内置题库 ──
   themes.forEach(theme => {
     html += `<div class="bank-section-title" id="topics-sec-${theme}">${theme}</div>`;
     html += TOPICS.filter(t => t.theme === theme).map(t => {
+      const idx = TOPICS.indexOf(t);
       const done = practiced.has(t.text);
-      return `<div class="bank-item${done ? ' practiced' : ''}"><div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</div></div>`;
+      return `<div class="bank-item${done ? ' practiced' : ''}">
+        <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</div>
+        ${favBtn(t.text, favs)}
+        <button class="bank-item-practice" onclick="startBuiltinTopic(${idx})">练习</button>
+      </div>`;
     }).join('');
   });
 
@@ -3114,6 +3281,23 @@ function startInterviewTopic(idx) {
   const t = INTERVIEW_TOPICS[idx];
   if (!t) return;
   S.topic = { text: t.text, theme: '结构化面试', subtype: t.subtype, d: 2 };
+  S.mode = 'topic';
+  goReady();
+}
+
+function startBuiltinTopic(idx) {
+  const t = TOPICS[idx];
+  if (!t) return;
+  S.topic = t;
+  S.mode = 'topic';
+  goReady();
+}
+
+function startCustomTopic(i) {
+  const customs = loadCustomTopics();
+  const t = customs[i];
+  if (!t) return;
+  S.topic = { text: t.text, theme: t.theme, d: t.d || 2 };
   S.mode = 'topic';
   goReady();
 }
