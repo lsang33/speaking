@@ -108,6 +108,10 @@ input:focus { outline: none; border-color: var(--gold); }
 .eval-block { background: var(--card); border-radius: 12px; padding: 14px 16px; }
 .eval-block .label { display: block; margin-bottom: 6px; }
 .eval-block p { font-size: 15px; line-height: 1.65; }
+.eval-merged { background: var(--card); border-radius: 12px; padding: 14px 16px; }
+.eval-sect + .eval-sect { border-top: 1px solid #222; margin-top: 12px; padding-top: 12px; }
+.eval-sect .label { display: block; margin-bottom: 6px; }
+.eval-sect p { font-size: 15px; line-height: 1.65; margin: 0; }
 
 /* ── SCORE ── */
 .score-ring {
@@ -561,7 +565,7 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
-  <div id="res-score-reason" style="display:none; font-size:13px; color:var(--muted); background:var(--card); border-radius:10px; padding:10px 14px; line-height:1.6;"></div>
+  <div id="res-score-reason" style="display:none;"></div>
 
   <div class="topic-card" style="padding:14px 18px;" id="res-topic-display"></div>
 
@@ -1407,7 +1411,7 @@ function setHistFilter(theme) {
 
 function parseEvalSections(evalText) {
   if (!evalText) return [];
-  return [
+  const keys = [
     { k: '叙事结构', icon: '📖' },
     { k: '细节生动性', icon: '🎨' },
     { k: '逻辑结构', icon: '🧩' },
@@ -1415,7 +1419,9 @@ function parseEvalSections(evalText) {
     { k: '本次亮点', icon: '✨' },
     { k: '明日聚焦', icon: '🎯' },
     { k: '口误标记', icon: '🔍' },
-  ].map(({ k, icon }) => {
+    { k: '评分理由', icon: '💬' },
+  ];
+  return keys.map(({ k, icon }) => {
     const m = evalText.match(new RegExp(`\\*\\*${k}\\*\\*[：:]([\\s\\S]*?)(?=\\*\\*|$)`));
     return m ? { k, icon, text: m[1].trim() } : null;
   }).filter(Boolean);
@@ -1470,13 +1476,9 @@ function renderHistList(sessions) {
           <audio id="ael-${h.id}" style="display:none;"></audio>
         </div>` : ''}
 
-        <div class="flex col gap-8" style="margin-top:${hasAudio ? 10 : 0}px;">
-          ${sections.map(s => `
-          <div class="eval-block">
-            <span class="label">${s.icon} ${s.k}</span>
-            <p>${s.text}</p>
-          </div>`).join('')}
-        </div>
+        ${sections.length ? `<div class="eval-merged" style="margin-top:${hasAudio ? 10 : 0}px;">
+          ${sections.map(s => `<div class="eval-sect"><span class="label">${s.icon} ${s.k}</span><p>${s.text}</p></div>`).join('')}
+        </div>` : ''}
 
         ${cheer ? `<div style="margin-top:10px;background:var(--card2);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--gold);text-align:center;">${cheer}</div>` : ''}
 
@@ -2617,78 +2619,15 @@ function showResult(session, evalText) {
   document.getElementById('res-score').textContent = session.score;
   document.getElementById('res-meta').textContent =
     `${session.date} · ${Math.floor(session.duration/60)}分${session.duration%60}秒 · 连续${S.streak}天`;
-  const reasonM = evalText.match(/\*\*评分理由\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
-  const reasonEl = document.getElementById('res-score-reason');
-  if (reasonM) {
-    reasonEl.textContent = reasonM[1].trim();
-    reasonEl.style.display = 'block';
-  } else {
-    reasonEl.style.display = 'none';
-  }
   document.getElementById('res-topic-display').innerHTML =
     `<div class="label" style="margin-bottom:6px;">${session.theme}</div>
      <div style="font-size:15px;font-weight:500;line-height:1.5;">${session.topic}</div>`;
 
-  // ── 客观数据卡 ──
+  // ── 合并卡片：客观数据 + AI 评估 + 评分理由 ──
   const tm = session.metrics;
   const am = session.audioMetrics;
-  const metricsEl = document.getElementById('res-metrics');
-  if (tm) {
-    const fillerClass = tm.totalFillers === 0 ? 'ok' : tm.totalFillers <= 2 ? 'warn' : 'bad';
-    const paceClass = tm.pace >= 200 && tm.pace <= 270 ? 'ok' : tm.pace >= 160 && tm.pace <= 310 ? 'warn' : 'bad';
-    const fillerHint = tm.totalFillers === 0 ? '零口头禅' :
-      Object.entries(tm.fillerCounts).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([w,c])=>`${w}×${c}`).join(' ');
+  document.getElementById('res-metrics').innerHTML = '';
 
-    const penaltySec = (S.pausePenalty || 4000) / 1000;
-    const threshSec = ((S.pauseThresh || 1000) / 1000).toFixed(1).replace(/\.0$/, '');
-    const longPauses = am ? (am.pauses || []).filter(p => p >= penaltySec).length : 0;
-    const normalPauses = am ? am.pauseCount - longPauses : 0;
-    const amCells = am ? `
-      <div class="metric-item">
-        <div class="metric-val ${longPauses === 0 ? 'ok' : longPauses <= 1 ? 'warn' : 'bad'}">${longPauses}</div>
-        <div class="metric-label">卡顿次数</div>
-        <div class="metric-hint">≥${penaltySec}秒</div>
-      </div>
-      <div class="metric-item">
-        <div class="metric-val ok">${normalPauses}</div>
-        <div class="metric-label">思考停顿</div>
-        <div class="metric-hint">≥${threshSec}秒</div>
-      </div>
-      <div class="metric-item">
-        <div class="metric-val ${am.volumeCV >= 0.3 ? 'ok' : 'warn'}">${am.volumeCV}</div>
-        <div class="metric-label">音量变化</div>
-        <div class="metric-hint">${am.volumeCV < 0.25 ? '较单调' : am.volumeCV < 0.5 ? '有起伏' : '变化丰富'}</div>
-      </div>` : '';
-
-    metricsEl.innerHTML = `
-      <div class="card flex col gap-10">
-        <div class="label">📊 客观数据</div>
-        <div class="metrics-grid">
-          <div class="metric-item">
-            <div class="metric-val ${paceClass}">${tm.pace}</div>
-            <div class="metric-label">字/分钟</div>
-            <div class="metric-hint">${tm.pace < 150 ? '偏慢' : tm.pace > 310 ? '偏快' : tm.pace < 200 ? '略慢' : tm.pace > 270 ? '略快' : '正常'}</div>
-          </div>
-          <div class="metric-item">
-            <div class="metric-val ${fillerClass}">${tm.totalFillers}</div>
-            <div class="metric-label">口头禅次数</div>
-            <div class="metric-hint">${fillerHint}</div>
-          </div>
-          <div class="metric-item">
-            <div class="metric-val">${tm.chars}</div>
-            <div class="metric-label">有效字数</div>
-            <div class="metric-hint">${tm.sentences} 句</div>
-          </div>
-          ${amCells}
-        </div>
-        ${tm.totalFillers > 0 ? `<div style="font-size:12px;color:var(--muted);">口头禅：${Object.entries(tm.fillerCounts).map(([w,c])=>`「${w}」${c}次`).join('、')}</div>` : ''}
-        ${tm.totalRepeats > 0 ? `<div style="font-size:12px;color:var(--muted);">重复词：${Object.entries(tm.repeatCounts).map(([w,c])=>`「${w}${w}」${c}次`).join('、')}</div>` : ''}
-      </div>`;
-  } else {
-    metricsEl.innerHTML = '';
-  }
-
-  // ── AI 评估 ──
   const slipSect = session.asrType === 'api' ? [{ k: '口误标记', icon: '🔍' }] : [];
   const sects = session.mode === 'story'
     ? [
@@ -2706,16 +2645,73 @@ function showResult(session, evalText) {
       { k: '明日聚焦', icon: '🎯' },
       ...slipSect,
     ];
-  const cont = document.getElementById('res-evals');
-  cont.innerHTML = '';
+
+  let sectHtml = '';
+
+  // 客观数据段
+  if (tm) {
+    const fillerClass = tm.totalFillers === 0 ? 'ok' : tm.totalFillers <= 2 ? 'warn' : 'bad';
+    const paceClass = tm.pace >= 200 && tm.pace <= 270 ? 'ok' : tm.pace >= 160 && tm.pace <= 310 ? 'warn' : 'bad';
+    const fillerHint = tm.totalFillers === 0 ? '零口头禅' :
+      Object.entries(tm.fillerCounts).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([w,c])=>`${w}×${c}`).join(' ');
+    const penaltySec = (S.pausePenalty || 4000) / 1000;
+    const threshSec = ((S.pauseThresh || 1000) / 1000).toFixed(1).replace(/\.0$/, '');
+    const longPauses = am ? (am.pauses || []).filter(p => p >= penaltySec).length : 0;
+    const normalPauses = am ? am.pauseCount - longPauses : 0;
+    const amCells = am ? `
+      <div class="metric-item">
+        <div class="metric-val ${longPauses === 0 ? 'ok' : longPauses <= 1 ? 'warn' : 'bad'}">${longPauses}</div>
+        <div class="metric-label">卡顿次数</div><div class="metric-hint">≥${penaltySec}秒</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val ok">${normalPauses}</div>
+        <div class="metric-label">思考停顿</div><div class="metric-hint">≥${threshSec}秒</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val ${am.volumeCV >= 0.3 ? 'ok' : 'warn'}">${am.volumeCV}</div>
+        <div class="metric-label">音量变化</div>
+        <div class="metric-hint">${am.volumeCV < 0.25 ? '较单调' : am.volumeCV < 0.5 ? '有起伏' : '变化丰富'}</div>
+      </div>` : '';
+    sectHtml += `<div class="eval-sect">
+      <span class="label">📊 客观数据</span>
+      <div class="metrics-grid">
+        <div class="metric-item">
+          <div class="metric-val ${paceClass}">${tm.pace}</div>
+          <div class="metric-label">字/分钟</div>
+          <div class="metric-hint">${tm.pace < 150 ? '偏慢' : tm.pace > 310 ? '偏快' : tm.pace < 200 ? '略慢' : tm.pace > 270 ? '略快' : '正常'}</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-val ${fillerClass}">${tm.totalFillers}</div>
+          <div class="metric-label">口头禅次数</div>
+          <div class="metric-hint">${fillerHint}</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-val">${tm.chars}</div>
+          <div class="metric-label">有效字数</div>
+          <div class="metric-hint">${tm.sentences} 句</div>
+        </div>
+        ${amCells}
+      </div>
+      ${tm.totalFillers > 0 ? `<div style="font-size:12px;color:var(--muted);margin-top:8px;">口头禅：${Object.entries(tm.fillerCounts).map(([w,c])=>`「${w}」${c}次`).join('、')}</div>` : ''}
+      ${tm.totalRepeats > 0 ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">重复词：${Object.entries(tm.repeatCounts).map(([w,c])=>`「${w}${w}」${c}次`).join('、')}</div>` : ''}
+    </div>`;
+  }
+
+  // AI 评估段
   sects.forEach(({ k, icon }) => {
     const m = evalText.match(new RegExp(`\\*\\*${k}\\*\\*[：:]([\\s\\S]*?)(?=\\*\\*|$)`));
     if (!m) return;
-    const div = document.createElement('div');
-    div.className = 'eval-block';
-    div.innerHTML = `<span class="label">${icon} ${k}</span><p>${m[1].trim()}</p>`;
-    cont.appendChild(div);
+    sectHtml += `<div class="eval-sect"><span class="label">${icon} ${k}</span><p>${m[1].trim()}</p></div>`;
   });
+
+  // 评分理由段
+  const reasonM = evalText.match(/\*\*评分理由\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
+  if (reasonM) {
+    sectHtml += `<div class="eval-sect"><span class="label">💬 评分理由</span><p style="color:var(--muted);">${reasonM[1].trim()}</p></div>`;
+  }
+
+  const cont = document.getElementById('res-evals');
+  cont.innerHTML = sectHtml ? `<div class="eval-merged">${sectHtml}</div>` : '';
 
   const cm = evalText.match(/\*\*鼓励\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   document.getElementById('res-cheer').textContent = cm ? cm[1].trim() : '继续坚持，每天进步一点点。';
