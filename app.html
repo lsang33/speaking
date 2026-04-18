@@ -29,7 +29,7 @@ body {
 }
 
 /* ── SCREENS ── */
-.screen { display: none; flex-direction: column; min-height: 100vh; min-height: 100dvh; padding: 52px 20px 36px; }
+.screen { display: none; flex-direction: column; min-height: 100vh; min-height: 100dvh; padding: calc(16px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px)); }
 .screen.on { display: flex; }
 
 /* ── TYPE ── */
@@ -271,7 +271,7 @@ input:focus { outline: none; border-color: var(--gold); }
 .bank-item { background:var(--card); border-radius:10px; padding:12px 14px; display:flex; align-items:flex-start; gap:10px; margin-bottom:5px; }
 .bank-item-text { flex:1; font-size:14px; line-height:1.5; }
 .bank-item-del { background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; padding:2px 0; flex-shrink:0; margin-top:2px; }
-.bank-item-practice { background:none; border:1px solid #444; border-radius:6px; color:var(--muted); font-size:12px; cursor:pointer; padding:3px 10px; flex-shrink:0; margin-top:2px; transition:all .15s; }
+.bank-item-practice { background:none; border:1px solid #444; border-radius:6px; color:var(--muted); font-size:12px; cursor:pointer; padding:3px 10px; flex-shrink:0; transition:all .15s; }
 .bank-item-practice:active { background:var(--gold); border-color:var(--gold); color:#000; }
 .bank-item-fav { background:none; border:none; color:#555; font-size:16px; cursor:pointer; padding:2px 4px; flex-shrink:0; line-height:1; transition:color .15s; margin-top:1px; }
 .bank-item-fav.active { color:var(--gold); }
@@ -3200,15 +3200,14 @@ function renderTopicsPage() {
       const t = allT.find(x => x.text === text);
       if (!t) return '';
       const done = practiced.has(text);
-      return `<div class="bank-item${done ? ' practiced' : ''}">
-        <div class="bank-item-text">
+      return `<div class="bank-item${done ? ' practiced' : ''}" style="flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; gap:8px; width:100%;">
           <span class="theme-badge">${t.theme}</span>
-          <span style="display:block;margin-top:4px;">${text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
-        </div>
-        <div class="flex col gap-4" style="flex-shrink:0; align-items:flex-end;">
+          <span style="flex:1;"></span>
           ${favBtn(text, favs)}
           <button class="bank-item-practice" data-favtext="${text.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" onclick="startFavoriteTopic(this.dataset.favtext)">练习</button>
         </div>
+        <span style="font-size:14px; line-height:1.5;">${text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
       </div>`;
     }).join('');
   }
@@ -3224,8 +3223,10 @@ function renderTopicsPage() {
       const done = practiced.has(t.text);
       return `<div class="bank-item${done ? ' practiced' : ''}">
         <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</div>
-        ${favBtn(t.text, favs)}
-        <button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>
+        <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
+          ${favBtn(t.text, favs)}
+          <button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>
+        </div>
       </div>`;
     }).join('');
   });
@@ -3241,7 +3242,7 @@ function renderTopicsPage() {
           <span class="theme-badge">${t.theme}</span>
           <span style="display:block;margin-top:5px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
         </div>
-        <div class="flex col gap-4" style="flex-shrink:0; align-items:flex-end;">
+        <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
           ${favBtn(t.text, favs)}
           <button class="bank-item-practice" onclick="startCustomTopic(${i})">练习</button>
           <button class="bank-item-del" onclick="deleteCustomTopic(${i})">删除</button>
@@ -3260,8 +3261,10 @@ function renderTopicsPage() {
       const done = practiced.has(t.text);
       return `<div class="bank-item${done ? ' practiced' : ''}">
         <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</div>
-        ${favBtn(t.text, favs)}
-        <button class="bank-item-practice" onclick="startBuiltinTopic(${idx})">练习</button>
+        <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
+          ${favBtn(t.text, favs)}
+          <button class="bank-item-practice" onclick="startBuiltinTopic(${idx})">练习</button>
+        </div>
       </div>`;
     }).join('');
   });
