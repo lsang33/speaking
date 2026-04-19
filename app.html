@@ -2093,6 +2093,12 @@ function startCountdown() {
   if (S.mode === 'story') {
     S.storyTitle = document.getElementById('story-title-input').value.trim();
   }
+  // 提前请求麦克风权限，倒计时期间让用户处理弹窗
+  if (navigator.mediaDevices && !S._permStream) {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      S._permStream = stream; // 保存 stream，beginRecording 直接复用
+    }).catch(() => { S._permStream = null; });
+  }
   show('s-countdown');
   let n = 3;
   const tips = ['想好开头第一句', '深呼吸', '开口！'];
@@ -2127,7 +2133,11 @@ function releaseWakeLock() {
 function startMediaRecorder() {
   if (!window.MediaRecorder || !navigator.mediaDevices) return;
   acquireWakeLock();
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+  const streamPromise = S._permStream
+    ? Promise.resolve(S._permStream)
+    : navigator.mediaDevices.getUserMedia({ audio: true });
+  S._permStream = null;
+  streamPromise.then(stream => {
     const mimeType = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', '']
       .find(t => t === '' || MediaRecorder.isTypeSupported(t));
     const mr = new MediaRecorder(stream, mimeType ? { mimeType } : {});
