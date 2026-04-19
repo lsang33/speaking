@@ -615,7 +615,8 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <div class="flex gap-10 mt-auto">
     <button class="btn btn-ghost" onclick="goHistory()" style="flex:1;">历史</button>
-    <button class="btn btn-gold" onclick="goHome()" style="flex:2;">完成</button>
+    <button class="btn btn-ghost" onclick="retryTopic()" style="flex:1;">再来一次</button>
+    <button class="btn btn-gold" onclick="goHome()" style="flex:1;">完成</button>
   </div>
 </div>
 
@@ -1224,6 +1225,11 @@ function switchHomeTopicMode(e) {
   e.stopPropagation();
   S.homeTopicMode = S.homeTopicMode === 'recommend' ? 'random' : 'recommend';
   renderHomeTopic();
+}
+
+function retryTopic() {
+  // 保留当前 topic/mode，直接跳倒计时
+  startCountdown();
 }
 
 function goHome() {
@@ -2481,7 +2487,7 @@ async function evaluate() {
     ? '\n注意：本次转写由高精度 ASR 完成，文本如实记录了口误和磕巴。评估时请严格区分真口误与合法表达——以下不算口误也不应扣分：①汉语正常叠词（往往、常常、件件、生生不息等）；②跨词边界的字重叠（如「便利店」+「店员」）；③成语固定搭配。只有无意义重复（「我我觉得」）、说错自纠、明显磕巴才算口误。'
     : '';
   const slipSection = hasPunctuation
-    ? '\n**口误标记**：[只列出真实口误，非真实口误一律不出现在此处。真口误判断标准：①说错字立刻自我纠正（如「时动→生动」）；②无意义重复（如「我我觉得」）；③明显磕巴卡壳。以下绝对不列出：叠词（往往、件件、生生不息）、跨词边界字重叠（便利店+店员）、成语固定搭配。格式：「原文片段」→ 简述；无则填"无"]'
+    ? '\n**口误标记**：[只列出真实口误。判断标准——①自我纠正：转写中不会出现箭头，纠正表现为两个相邻词，前者语义不通或发音相近但用错（如「时动生动」中「时动」不是真实词语，紧跟正确词「生动」，说明说错了立刻纠正）；②无意义重复（如「我我觉得」「就是就是」）；③明显磕巴卡壳。绝对不标记：叠词（往往、件件、生生不息）、跨词边界字重叠（便利店+店员）、成语固定搭配。格式：「原文片段」→ 简述；无则填"无"]'
     : '';
 
   let prompt;
