@@ -152,8 +152,9 @@ input:focus { outline: none; border-color: var(--gold); }
   cursor: pointer; flex-shrink: 0; transition: opacity .15s;
 }
 .audio-btn:active { opacity: .7; }
-.audio-progress { flex: 1; height: 3px; background: #2a2a30; border-radius: 2px; overflow: hidden; }
-.audio-progress-bar { height: 100%; background: var(--gold); width: 0%; transition: width .5s linear; }
+.audio-progress { flex: 1; height: 20px; display: flex; align-items: center; cursor: pointer; position: relative; }
+.audio-progress-track { width: 100%; height: 4px; background: #2a2a30; border-radius: 2px; overflow: hidden; pointer-events: none; }
+.audio-progress-bar { height: 100%; background: var(--gold); width: 0%; transition: width .3s linear; }
 .del-audio-btn {
   background: none; border: none; color: var(--red); font-size: 12px;
   cursor: pointer; padding: 4px 0; flex-shrink: 0;
@@ -1469,7 +1470,9 @@ function renderHistList(sessions) {
         ${hasAudio ? `
         <div class="audio-row">
           <button class="audio-btn" id="abtn-${h.id}" onclick="toggleAudio('${h.id}');event.stopPropagation();">▶ 播放</button>
-          <div class="audio-progress"><div class="audio-progress-bar" id="aprog-${h.id}"></div></div>
+          <div class="audio-progress" onclick="seekAudio('${h.id}',event)" ontouchend="seekAudio('${h.id}',event);event.preventDefault()">
+            <div class="audio-progress-track"><div class="audio-progress-bar" id="aprog-${h.id}"></div></div>
+          </div>
           <span style="font-size:11px;color:var(--muted);min-width:36px;text-align:right;" id="atime-${h.id}"></span>
           <button class="del-audio-btn" onclick="exportSingleAudio(${JSON.stringify({id:h.id,date:h.date,theme:h.theme})});event.stopPropagation();" title="导出">↓</button>
           <button class="del-audio-btn" id="adelbtn-${h.id}" onclick="confirmDeleteAudio('${h.id}');event.stopPropagation();">删</button>
@@ -2110,8 +2113,20 @@ function startCountdown() {
 /* ═══════════════════════════════════════
    RECORDING
 ═══════════════════════════════════════ */
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    S._wakeLock = await navigator.wakeLock.request('screen');
+    S._wakeLock.addEventListener('release', () => { S._wakeLock = null; });
+  } catch(e) { /* 不支持或用户拒绝，静默忽略 */ }
+}
+function releaseWakeLock() {
+  if (S._wakeLock) { S._wakeLock.release().catch(() => {}); S._wakeLock = null; }
+}
+
 function startMediaRecorder() {
   if (!window.MediaRecorder || !navigator.mediaDevices) return;
+  acquireWakeLock();
   navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
     const mimeType = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', '']
       .find(t => t === '' || MediaRecorder.isTypeSupported(t));
@@ -2198,6 +2213,7 @@ function startMediaRecorder() {
 }
 
 function stopMediaRecorder() {
+  releaseWakeLock();
   // Stop real-time analyser
   if (S._analyserTimer) { clearInterval(S._analyserTimer); S._analyserTimer = null; }
   if (S._analyserCtx) { try { S._analyserCtx.close(); } catch(e) {} S._analyserCtx = null; }
@@ -2814,6 +2830,18 @@ async function exportBatch() {
    AUDIO PLAYBACK
 ═══════════════════════════════════════ */
 let currentPlayingId = null;
+
+function seekAudio(id, event) {
+  const audioEl = document.getElementById(`ael-${id}`);
+  if (!audioEl || !audioEl.duration) return;
+  const container = event.currentTarget;
+  const rect = container.getBoundingClientRect();
+  const clientX = event.changedTouches ? event.changedTouches[0].clientX : event.clientX;
+  const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const prog = document.getElementById(`aprog-${id}`);
+  if (prog) { prog.style.transition = 'none'; prog.style.width = (pct * 100) + '%'; setTimeout(() => prog.style.transition = '', 50); }
+  audioEl.currentTime = pct * audioEl.duration;
+}
 
 async function toggleAudio(id) {
   const btn = document.getElementById(`abtn-${id}`);
