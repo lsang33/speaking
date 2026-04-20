@@ -914,6 +914,7 @@ input:focus { outline: none; border-color: var(--gold); }
 
 <script src="topics.js"></script>
 <script src="words.js"></script>
+<script src="materials.js"></script>
 <script>
 /* ═══════════════════════════════════════
    APP
@@ -1137,8 +1138,8 @@ function computeLongestStreak() {
 }
 
 /* ── 素材本 ── */
-const MAT_TAGS = ['亲身经历','社会观察','金句观点','数据案例'];
-const MAT_ICONS = { '亲身经历':'📖', '社会观察':'👁', '金句观点':'💬', '数据案例':'📊' };
+const MAT_TAGS = ['亲身经历','社会观察','金句观点','诗词名句','数据案例'];
+const MAT_ICONS = { '亲身经历':'📖', '社会观察':'👁', '金句观点':'💬', '诗词名句':'🎋', '数据案例':'📊' };
 
 function loadMaterials() {
   try { return JSON.parse(ls('materials') || '[]'); } catch(e) { return []; }
@@ -1155,27 +1156,52 @@ function goMaterials() {
 
 function renderMaterialsPage() {
   const mats = loadMaterials();
-  // 标签栏
   const tags = ['all', ...MAT_TAGS];
   document.getElementById('mat-filter-bar').innerHTML = tags.map(t =>
     `<button class="filter-btn${matFilter === t ? ' active' : ''}" onclick="setMatFilter('${t}')">${t === 'all' ? '全部' : MAT_ICONS[t] + ' ' + t}</button>`
   ).join('');
-  // 列表
-  const filtered = matFilter === 'all' ? mats : mats.filter(m => m.tag === matFilter);
+
   const el = document.getElementById('mat-list');
-  if (!filtered.length) {
-    el.innerHTML = `<div class="muted" style="text-align:center;padding:40px 0;">${matFilter === 'all' ? '还没有素材，点右上角添加第一条' : '该分类暂无素材'}</div>`;
-    return;
+  let html = '';
+
+  // 个人素材
+  const myFiltered = matFilter === 'all' ? mats : mats.filter(m => m.tag === matFilter);
+  if (myFiltered.length) {
+    html += `<div class="bank-section-title">我的素材 ${myFiltered.length}</div>`;
+    html += myFiltered.map(m => `
+      <div class="card flex col gap-6">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="theme-badge">${MAT_ICONS[m.tag] || ''} ${m.tag}</span>
+          <span style="font-size:11px;color:var(--muted);">${m.date}</span>
+        </div>
+        <div style="font-size:14px;line-height:1.6;">${m.content}</div>
+        <button style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;text-align:left;padding:0;" onclick="deleteMaterial('${m.id}')">删除</button>
+      </div>`).join('');
+  } else if (matFilter === 'all') {
+    html += `<div class="muted" style="text-align:center;padding:20px 0;font-size:13px;">还没有素材，点右上角添加第一条</div>`;
   }
-  el.innerHTML = filtered.map(m => `
-    <div class="card flex col gap-6">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span class="theme-badge">${MAT_ICONS[m.tag] || ''} ${m.tag}</span>
-        <span style="font-size:11px;color:var(--muted);">${m.date}</span>
-      </div>
-      <div style="font-size:14px;line-height:1.6;">${m.content}</div>
-      <button style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;text-align:left;padding:0;" onclick="deleteMaterial('${m.id}')">删除</button>
-    </div>`).join('');
+
+  // 预置素材
+  const preFiltered = matFilter === 'all'
+    ? PRESET_MATERIALS
+    : PRESET_MATERIALS.filter(m => m.tag === matFilter);
+  if (preFiltered.length) {
+    html += `<div class="bank-section-title" style="margin-top:8px;">示例素材 ${preFiltered.length}</div>`;
+    html += preFiltered.map((m, i) => {
+      const realIdx = PRESET_MATERIALS.indexOf(m);
+      const saved = mats.some(x => x.content === m.content);
+      return `
+      <div class="card flex col gap-6" style="opacity:.85;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="theme-badge">${MAT_ICONS[m.tag] || ''} ${m.tag}</span>
+          ${saved ? '<span style="font-size:11px;color:var(--gold);">已收入</span>' : `<button style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;" onclick="addPresetMaterial(${realIdx})">＋ 收入素材本</button>`}
+        </div>
+        <div style="font-size:14px;line-height:1.6;">${m.content}</div>
+      </div>`;
+    }).join('');
+  }
+
+  el.innerHTML = html;
 }
 
 function setMatFilter(tag) {
@@ -1220,6 +1246,16 @@ function deleteMaterial(id) {
   renderMaterialsPage();
 }
 
+function addPresetMaterial(idx) {
+  const m = PRESET_MATERIALS[idx];
+  if (!m) return;
+  const mats = loadMaterials();
+  if (mats.some(x => x.content === m.content)) return;
+  mats.unshift({ id: Date.now().toString(), content: m.content, tag: m.tag, date: today() });
+  saveMaterials(mats);
+  renderMaterialsPage();
+}
+
 function openMyMaterials() {
   const out = document.getElementById('my-mat-out');
   if (out.style.display === 'block') { out.style.display = 'none'; return; }
@@ -1229,20 +1265,23 @@ function openMyMaterials() {
     out.style.display = 'block';
     return;
   }
-  // 关键词匹配
+  // 关键词匹配（个人 + 预置）
   const topic = S.topic ? S.topic.text : '';
-  const words = topic.replace(/[，。？！、]/g, ' ').split(/\s+/).filter(w => w.length >= 2);
-  const scored = mats.map(m => {
-    const hits = words.filter(w => m.content.includes(w)).length;
-    return { m, hits };
-  }).sort((a, b) => b.hits - a.hits);
-  const top = scored.slice(0, 5);
+  const kws = topic.replace(/[，。？！、]/g, ' ').split(/\s+/).filter(w => w.length >= 2);
+  const allMats = [
+    ...mats.map(m => ({ ...m, mine: true })),
+    ...PRESET_MATERIALS.map(m => ({ ...m, mine: false })),
+  ];
+  const scored = allMats.map(m => ({
+    m, hits: kws.filter(w => m.content.includes(w) || (S.topic && m.content.includes(S.topic.theme || ''))).length
+  })).sort((a, b) => b.hits - a.hits || (b.m.mine ? 1 : 0) - (a.m.mine ? 1 : 0));
+  const top = scored.filter((x, i) => i < 5 || x.hits > 0).slice(0, 6);
   const hasMatch = top.some(x => x.hits > 0);
   out.innerHTML = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${hasMatch ? '📒 可能相关的素材' : '📒 素材本（全部）'}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${hasMatch ? '📒 可能相关的素材' : '📒 素材（全部）'}</div>
     ${top.map(({ m }) => `
     <div style="padding:8px 0;border-bottom:1px solid #222;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${MAT_ICONS[m.tag]} ${m.tag} · ${m.date}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${MAT_ICONS[m.tag] || ''} ${m.tag}${m.mine ? '' : ' · 示例'}</div>
       <div style="font-size:13px;line-height:1.6;">${m.content}</div>
     </div>`).join('')}`;
   out.style.display = 'block';
