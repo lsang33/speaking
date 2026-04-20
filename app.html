@@ -407,6 +407,12 @@ input:focus { outline: none; border-color: var(--gold); }
     <span id="r-hint-text"></span>
   </div>
 
+  <!-- 素材支架 -->
+  <div id="scaffold-wrap">
+    <button class="btn btn-ghost" id="scaffold-btn" onclick="loadScaffold()" style="width:100%; font-size:14px;">💡 素材支架</button>
+    <div id="scaffold-out" style="display:none; margin-top:10px; background:var(--card); border-radius:12px; padding:14px 16px; font-size:14px; line-height:1.8;"></div>
+  </div>
+
   <div class="mt-auto flex col gap-10">
     <!-- 准备倒计时 -->
     <div id="prep-timer-box" style="display:none; text-align:center; padding:10px 0 4px;">
@@ -1292,6 +1298,58 @@ function renderTopicToReady(t, reason) {
     reasonEl.style.display = 'block';
   } else {
     reasonEl.style.display = 'none';
+  }
+  // 换题时重置素材支架
+  document.getElementById('scaffold-out').style.display = 'none';
+  document.getElementById('scaffold-out').innerHTML = '';
+  document.getElementById('scaffold-btn').style.display = 'block';
+  document.getElementById('scaffold-btn').textContent = '💡 素材支架——不知道说什么？点这里';
+  document.getElementById('scaffold-btn').disabled = false;
+  _scaffoldCache = {};
+}
+
+const _scaffoldCache = {};
+
+async function loadScaffold() {
+  const topic = S.topic;
+  if (!topic) return;
+  const key = topic.text;
+  const btn = document.getElementById('scaffold-btn');
+  const out = document.getElementById('scaffold-out');
+
+  // 已缓存直接展示
+  if (_scaffoldCache[key]) {
+    out.innerHTML = _scaffoldCache[key];
+    out.style.display = 'block';
+    btn.style.display = 'none';
+    return;
+  }
+
+  btn.textContent = '生成中…';
+  btn.disabled = true;
+
+  const prompt = `你是口才训练教练。学员拿到一道练习题，但不知道说什么内容。
+请为这道题提供「素材支架」：3个不同的切入角度，每个角度包含：
+① 角度名称（4字以内）
+② 一个引导问题（帮学员回忆自己的亲身经历或观察，不要给答案，只是引导）
+③ 一句话说明这个角度怎么展开
+
+注意：不要直接给示范答案，只帮学员找到自己的素材。语言简洁，每个角度不超过3行。
+
+题目：${topic.text}`;
+
+  try {
+    const text = await callLLM(prompt, 400);
+    const html = text.trim().replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>');
+    const formatted = `<p>${html}</p>`;
+    _scaffoldCache[key] = formatted;
+    out.innerHTML = formatted;
+    out.style.display = 'block';
+    btn.style.display = 'none';
+  } catch(e) {
+    btn.textContent = '💡 素材支架';
+    btn.disabled = false;
+    alert('获取失败：' + e.message);
   }
 }
 
