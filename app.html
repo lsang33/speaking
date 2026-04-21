@@ -426,7 +426,7 @@ input:focus { outline: none; border-color: var(--gold); }
       <div style="font-size:56px; font-weight:200; color:var(--gold); font-variant-numeric:tabular-nums; line-height:1;" id="prep-countdown-num">30</div>
       <div style="font-size:12px; color:var(--muted); margin-top:6px;">倒计时结束后自动开始</div>
     </div>
-    <button class="btn btn-gold" id="ready-start-btn" onclick="startCountdown()">准备好了，开始录音</button>
+    <button class="btn btn-gold" id="ready-start-btn" onclick="onReadyStart()">准备好了，开始录音</button>
     <button class="btn btn-ghost" id="prep-skip-btn" style="display:none; font-size:14px;" onclick="skipPrepTimer()">跳过准备，直接开始</button>
   </div>
 </div>
@@ -882,6 +882,13 @@ input:focus { outline: none; border-color: var(--gold); }
     <button onclick="showAddTopic()" class="btn btn-gold btn-sm">+ 添加题目</button>
   </div>
   <h2>题库</h2>
+
+  <!-- 搜索框 -->
+  <div style="position:relative;">
+    <input id="topics-search" type="search" placeholder="搜索题目关键词…" oninput="setTopicsSearch(this.value)"
+      style="width:100%;background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:9px 12px 9px 36px;box-sizing:border-box;outline:none;-webkit-appearance:none;">
+    <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none;">🔍</span>
+  </div>
 
   <!-- 类别标签栏 -->
   <div class="filter-bar" id="topics-tab-bar"></div>
@@ -1781,14 +1788,28 @@ function switchToRecommendTopic() {
   S.topic = topic;
   cancelPrepTimer();
   renderTopicToReady(topic, reason);
-  startPrepTimer();
+  document.getElementById('prep-timer-box').style.display = 'none';
+  document.getElementById('prep-skip-btn').style.display = 'none';
+  document.getElementById('ready-start-btn').textContent = '准备好了，开始录音';
+}
+
+function onReadyStart() {
+  if (S.prepTime > 0) {
+    startPrepTimer();
+  } else {
+    startCountdown();
+  }
 }
 
 function goReady() {
   if (!S.topic) S.topic = todayTopic();
   renderTopicToReady(S.topic);
+  // 重置按钮和计时器状态
+  cancelPrepTimer();
+  document.getElementById('prep-timer-box').style.display = 'none';
+  document.getElementById('prep-skip-btn').style.display = 'none';
+  document.getElementById('ready-start-btn').textContent = '准备好了，开始录音';
   show('s-ready');
-  startPrepTimer();
 }
 
 
@@ -3640,7 +3661,10 @@ function pickTopic(i) {
   renderTopicToReady(t);
   document.getElementById('h-theme').textContent = t.theme;
   document.getElementById('h-topic').textContent = t.text;
-  startPrepTimer();
+  cancelPrepTimer();
+  document.getElementById('prep-timer-box').style.display = 'none';
+  document.getElementById('prep-skip-btn').style.display = 'none';
+  document.getElementById('ready-start-btn').textContent = '准备好了，开始录音';
   closePicker();
 }
 
@@ -3654,14 +3678,27 @@ function pickRandom() {
   renderTopicToReady(t);
   document.getElementById('h-theme').textContent = t.theme;
   document.getElementById('h-topic').textContent = t.text;
-  startPrepTimer();
+  cancelPrepTimer();
+  document.getElementById('prep-timer-box').style.display = 'none';
+  document.getElementById('prep-skip-btn').style.display = 'none';
+  document.getElementById('ready-start-btn').textContent = '准备好了，开始录音';
   closePicker();
 }
 
 /* ═══════════════════════════════════════
    TOPIC BANK
 ═══════════════════════════════════════ */
+let topicsSearch = '';
+
+function setTopicsSearch(val) {
+  topicsSearch = val.trim();
+  renderTopicsPage();
+}
+
 function goTopics() {
+  topicsSearch = '';
+  const inp = document.getElementById('topics-search');
+  if (inp) inp.value = '';
   renderTopicsPage();
   show('s-topics');
 }
@@ -3693,6 +3730,44 @@ function renderTopicsPage() {
   const favs = loadFavorites();
   const customs = loadCustomTopics();
   const themes = [...new Set(TOPICS.map(t => t.theme))];
+
+  // ── 搜索模式 ──
+  if (topicsSearch) {
+    const q = topicsSearch.toLowerCase();
+    document.getElementById('topics-tab-bar').style.display = 'none';
+    const allT = [
+      ...TOPICS.map((t, i) => ({ ...t, _type: 'builtin', _i: i })),
+      ...INTERVIEW_TOPICS.map((t, i) => ({ text: t.text, theme: '结构化面试', d: 2, subtype: t.subtype, _type: 'interview', _i: i })),
+      ...customs.map((t, i) => ({ ...t, _type: 'custom', _i: i })),
+    ];
+    const hits = allT.filter(t => t.text.toLowerCase().includes(q));
+    let html = '';
+    if (!hits.length) {
+      html = `<div class="muted" style="text-align:center;padding:30px 0;font-size:13px;">没有找到"${topicsSearch}"相关题目</div>`;
+    } else {
+      html = hits.map(t => {
+        const done = practiced.has(t.text);
+        let practiceBtn = '';
+        if (t._type === 'builtin') practiceBtn = `<button class="bank-item-practice" onclick="startBuiltinTopic(${t._i})">练习</button>`;
+        else if (t._type === 'interview') practiceBtn = `<button class="bank-item-practice" onclick="startInterviewTopic(${t._i})">练习</button>`;
+        else practiceBtn = `<button class="bank-item-practice" onclick="startCustomTopic(${t._i})">练习</button>`;
+        return `<div class="bank-item${done ? ' practiced' : ''}">
+          <div class="bank-item-text">
+            <span class="theme-badge">${t.theme}</span>
+            <span style="display:block;margin-top:4px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
+          </div>
+          <div class="flex gap-6" style="flex-shrink:0;align-items:center;">
+            ${favBtn(t.text, favs)}
+            ${practiceBtn}
+          </div>
+        </div>`;
+      }).join('');
+    }
+    document.getElementById('topics-list').innerHTML = html;
+    return;
+  }
+
+  document.getElementById('topics-tab-bar').style.display = '';
   const tabThemes = [
     ...(favs.size ? ['收藏'] : []),
     '结构化面试',
