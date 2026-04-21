@@ -139,6 +139,7 @@ input:focus { outline: none; border-color: var(--gold); }
 .filter-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .filter-bar::-webkit-scrollbar { display: none; }
 #topics-tab-bar { overflow-x: visible; flex-wrap: wrap; padding-bottom: 8px; position: sticky; top: 0; background: var(--bg); z-index: 10; padding-top: 6px; margin: -6px -20px 0; padding-left: 20px; padding-right: 20px; }
+#mat-filter-bar { overflow-x: visible; flex-wrap: wrap; padding-bottom: 4px; }
 .filter-btn {
   flex-shrink: 0; padding: 6px 14px; border-radius: 20px;
   border: none; font-size: 13px; cursor: pointer;
@@ -1291,32 +1292,36 @@ async function extractMaterials() {
   btn.textContent = '提取中…';
   btn.disabled = true;
 
-  const prompt = `请从以下文章中提取可用于口才练习的素材。
+  const prompt = `你是一位口才教练，请从以下文章中提取可直接用于演讲练习的素材。
 
-分类说明：
-- 金句观点：有力的观点、名人引语、可辩驳的论断
-- 社会观察：对社会现象或人物行为的具体描述与洞察
-- 数据案例：具体数字、真实事件、典型案例
+【素材类型】
+- 金句观点：有力论断、类比、反直觉洞见、可辩驳的观点
+- 社会观察：对社会现象、人物行为的具体场景描述与洞察
+- 数据案例：真实事件、典型案例、具体数字（可跨段落综合）
 - 诗词名句：古诗词、成语、格言
 
-要求：
-1. 每类最多3条，总计不超过10条，只提取真正有价值的
-2. 每条精简为1-2句话，保留核心内容，去掉冗余
-3. 严格按以下格式输出，不要有任何其他内容：
+【提取原则】
+1. 不要逐句复制，要跨段落综合，提炼成一条完整、有观点的素材
+2. 每条素材写3-4句话：核心内容 + 延伸洞察，让人读完能直接用来说话
+3. 每条附一行用法提示，格式：用法：适合xxx / 谈xxx / 升华xxx
+4. 每类最多3条，只提取真正有价值的，没有则跳过
+5. 严格按以下格式输出，不要输出任何其他内容
 
 [金句观点]
-• 内容
+• 素材内容（3-4句）
+用法：xxx
 
 [社会观察]
-• 内容
+• 素材内容（3-4句）
+用法：xxx
 
 [数据案例]
-• 内容
+• 素材内容（3-4句）
+用法：xxx
 
 [诗词名句]
-• 内容
-
-没有该类素材则跳过该分类。
+• 素材内容（3-4句）
+用法：xxx
 
 文章：
 ${article}`;
@@ -1326,6 +1331,8 @@ ${article}`;
     const parsed = parseExtracted(text);
     if (!parsed.length) { alert('未能提取到有效素材，请尝试换一篇文章'); btn.textContent = '开始提取'; btn.disabled = false; return; }
     renderExtractResult(parsed);
+    btn.textContent = '开始提取';
+    btn.disabled = false;
   } catch(e) {
     alert('提取失败：' + e.message);
     btn.textContent = '开始提取';
@@ -1337,16 +1344,46 @@ function parseExtracted(text) {
   const tagMap = { '金句观点': '金句观点', '社会观察': '社会观察', '数据案例': '数据案例', '诗词名句': '诗词名句' };
   const results = [];
   let currentTag = null;
+  let currentItem = null;
+
+  function flush() {
+    if (currentItem && currentItem.content.length > 10) results.push(currentItem);
+    currentItem = null;
+  }
+
   for (const line of text.split('\n')) {
     const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // 分类标题
+    let matched = false;
     for (const [key, tag] of Object.entries(tagMap)) {
-      if (trimmed.includes(`[${key}]`)) { currentTag = tag; break; }
+      if (trimmed.includes(`[${key}]`)) { flush(); currentTag = tag; matched = true; break; }
     }
-    if (currentTag && (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*'))) {
+    if (matched) continue;
+
+    if (!currentTag) continue;
+
+    // 新素材开始
+    if (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*')) {
+      flush();
       const content = trimmed.replace(/^[•\-*]\s*/, '').trim();
-      if (content.length > 5) results.push({ tag: currentTag, content });
+      currentItem = { tag: currentTag, content, usage: '' };
+      continue;
     }
+
+    if (!currentItem) continue;
+
+    // 用法行
+    if (trimmed.startsWith('用法：') || trimmed.startsWith('用法:')) {
+      currentItem.usage = trimmed.replace(/^用法[：:]\s*/, '').trim();
+      continue;
+    }
+
+    // 续行（多句内容）
+    currentItem.content += (currentItem.content ? '　' : '') + trimmed;
   }
+  flush();
   return results;
 }
 
@@ -1354,10 +1391,11 @@ function renderExtractResult(items) {
   const el = document.getElementById('mat-extract-items');
   el.innerHTML = items.map((m, i) => `
     <label style="display:flex;align-items:flex-start;gap:10px;background:var(--card2);border-radius:10px;padding:10px 12px;cursor:pointer;">
-      <input type="checkbox" checked data-idx="${i}" style="margin-top:3px;flex-shrink:0;accent-color:var(--gold);">
+      <input type="checkbox" data-idx="${i}" style="margin-top:3px;flex-shrink:0;accent-color:var(--gold);">
       <div>
         <div style="font-size:11px;color:var(--gold);margin-bottom:4px;">${MAT_ICONS[m.tag] || ''} ${m.tag}</div>
         <div style="font-size:13px;line-height:1.6;">${m.content}</div>
+        ${m.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.8;margin-top:4px;">🏷 ${m.usage}</div>` : ''}
       </div>
     </label>`).join('');
   document.getElementById('mat-extract-result').style.display = 'flex';
@@ -1916,6 +1954,11 @@ function renderHistList(sessions) {
       </div>
 
       <div class="hist-detail ${open ? 'open' : ''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span style="font-size:12px;color:var(--muted);">展开详情</span>
+          <button class="btn btn-ghost btn-sm" onclick="retryHistSession('${h.id}');event.stopPropagation();" style="font-size:13px;">↩ 重试</button>
+        </div>
+
         ${hasAudio ? `
         <div class="audio-row">
           <button class="audio-btn" id="abtn-${h.id}" onclick="toggleAudio('${h.id}');event.stopPropagation();">▶ 播放</button>
@@ -1936,13 +1979,12 @@ function renderHistList(sessions) {
 
         ${h.transcript ? `
         <div style="margin-top:10px;">
-          <div class="label" style="margin-bottom:6px;">📝 转写原文</div>
-          <div style="font-size:13px;color:var(--muted);line-height:1.65;background:var(--card2);border-radius:8px;padding:10px;">${h.transcript}</div>
+          <button onclick="var d=this.nextElementSibling;var show=d.style.display==='none'||!d.style.display;d.style.display=show?'block':'none';this.textContent=show?'📝 转写原文 ▲':'📝 转写原文 ▶';event.stopPropagation();" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0;margin-bottom:6px;">📝 转写原文 ▶</button>
+          <div style="display:none;font-size:13px;color:var(--muted);line-height:1.65;background:var(--card2);border-radius:8px;padding:10px;">${h.transcript}</div>
         </div>` : ''}
 
-        <div style="margin-top:12px; padding-top:10px; border-top:1px solid #2a2a30; display:flex; align-items:center; justify-content:space-between;">
+        <div style="margin-top:12px; padding-top:10px; border-top:1px solid #2a2a30; display:flex; align-items:center; justify-content:flex-end;">
           <button class="del-audio-btn" style="font-size:13px;" onclick="confirmDeleteSession('${h.id}');event.stopPropagation();">🗑 删除此记录</button>
-          <button class="btn btn-ghost btn-sm" onclick="retryHistSession('${h.id}');event.stopPropagation();" style="font-size:13px;">↩ 重试</button>
         </div>
       </div>
     </div>`;
