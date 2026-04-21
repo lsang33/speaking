@@ -841,10 +841,12 @@ input:focus { outline: none; border-color: var(--gold); }
   <!-- 分类筛选 -->
   <div class="filter-bar" id="mat-filter-bar"></div>
 
-  <!-- 手动添加表单 -->
+  <!-- 手动添加/编辑表单 -->
   <div id="mat-add-box" class="card flex col gap-12" style="display:none;">
-    <div style="font-size:14px; font-weight:600;">记录一条素材</div>
+    <div style="font-size:14px; font-weight:600;" id="mat-add-title">记录一条素材</div>
+    <input type="hidden" id="mat-edit-id" value=""/>
     <textarea id="mat-content" style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:10px 12px;width:100%;min-height:80px;resize:vertical;font-family:inherit;" placeholder="记下这条素材的核心——一个经历、一句话、一个案例…"></textarea>
+    <input id="mat-usage" type="text" placeholder="备注：适合用在哪里（可选）" style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:13px;padding:9px 12px;width:100%;box-sizing:border-box;outline:none;"/>
     <div class="flex gap-6" id="mat-tag-chips" style="flex-wrap:wrap;"></div>
     <input type="hidden" id="mat-tag" value="亲身经历"/>
     <div class="flex gap-8">
@@ -1187,7 +1189,7 @@ function renderMaterialsPage() {
   const mats = loadMaterials();
   const tags = ['all', ...MAT_TAGS];
   document.getElementById('mat-filter-bar').innerHTML = tags.map(t =>
-    `<button class="filter-btn${matFilter === t ? ' active' : ''}" onclick="setMatFilter('${t}')">${t === 'all' ? '全部' : MAT_ICONS[t] + ' ' + t}</button>`
+    `<button class="filter-btn${matFilter === t ? ' active' : ''}" onclick="setMatFilter('${t}')">${t === 'all' ? '全部' : t}</button>`
   ).join('');
 
   const el = document.getElementById('mat-list');
@@ -1204,8 +1206,11 @@ function renderMaterialsPage() {
           <span style="font-size:11px;color:var(--muted);">${m.date}</span>
         </div>
         <div style="font-size:14px;line-height:1.6;">${m.content}</div>
-        ${m.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.8;">🏷 ${m.usage}</div>` : ''}
-        <button style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;text-align:left;padding:0;" onclick="deleteMaterial('${m.id}')">删除</button>
+        ${m.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.8;">🏷 ${m.usage}</div>` : '<div style="font-size:11px;color:#444;opacity:.7;">🏷 未添加备注</div>'}
+        <div style="display:flex;gap:12px;">
+          <button style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;" onclick="editMaterial('${m.id}')">编辑</button>
+          <button style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:0;" onclick="deleteMaterial('${m.id}')">删除</button>
+        </div>
       </div>`).join('');
   } else if (matFilter === 'all') {
     html += `<div class="muted" style="text-align:center;padding:20px 0;font-size:13px;">还没有素材，点右上角添加第一条</div>`;
@@ -1242,11 +1247,30 @@ function setMatFilter(tag) {
 
 function showAddMaterial(prefill) {
   document.getElementById('mat-add-box').style.display = 'flex';
+  document.getElementById('mat-add-title').textContent = '记录一条素材';
+  document.getElementById('mat-edit-id').value = '';
   document.getElementById('mat-content').value = prefill || '';
+  document.getElementById('mat-usage').value = '';
   document.getElementById('mat-tag').value = '亲身经历';
   document.getElementById('mat-tag-chips').innerHTML = MAT_TAGS.map(t =>
-    `<button type="button" class="preset-btn${t === '亲身经历' ? ' active' : ''}" onclick="selectMatTag('${t}',this)">${MAT_ICONS[t]} ${t}</button>`
+    `<button type="button" class="preset-btn${t === '亲身经历' ? ' active' : ''}" onclick="selectMatTag('${t}',this)">${t}</button>`
   ).join('');
+  document.getElementById('mat-add-box').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function editMaterial(id) {
+  const m = loadMaterials().find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('mat-add-box').style.display = 'flex';
+  document.getElementById('mat-add-title').textContent = '编辑素材';
+  document.getElementById('mat-edit-id').value = id;
+  document.getElementById('mat-content').value = m.content || '';
+  document.getElementById('mat-usage').value = m.usage || '';
+  document.getElementById('mat-tag').value = m.tag || '亲身经历';
+  document.getElementById('mat-tag-chips').innerHTML = MAT_TAGS.map(t =>
+    `<button type="button" class="preset-btn${t === (m.tag || '亲身经历') ? ' active' : ''}" onclick="selectMatTag('${t}',this)">${t}</button>`
+  ).join('');
+  document.getElementById('mat-add-box').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function hideAddMaterial() {
@@ -1259,13 +1283,20 @@ function selectMatTag(tag, btn) {
   btn.classList.add('active');
 }
 
-function saveMaterial(content, tag) {
+function saveMaterial(content, tag, usage) {
   const c = content || document.getElementById('mat-content').value.trim();
   const t = tag || document.getElementById('mat-tag').value || '亲身经历';
+  const u = usage !== undefined ? usage : document.getElementById('mat-usage').value.trim();
   if (!c) { if (!content) document.getElementById('mat-content').style.borderColor = 'var(--red)'; return; }
   if (!content) document.getElementById('mat-content').style.borderColor = '#333';
+  const editId = document.getElementById('mat-edit-id').value;
   const mats = loadMaterials();
-  mats.unshift({ id: Date.now().toString(), content: c, tag: t, date: today() });
+  if (editId) {
+    const idx = mats.findIndex(x => x.id === editId);
+    if (idx >= 0) mats[idx] = { ...mats[idx], content: c, tag: t, usage: u };
+  } else {
+    mats.unshift({ id: Date.now().toString(), content: c, tag: t, usage: u, date: today() });
+  }
   saveMaterials(mats);
   hideAddMaterial();
   renderMaterialsPage();
@@ -1417,7 +1448,7 @@ function confirmExtracted() {
   checked.forEach(cb => {
     const m = items[parseInt(cb.dataset.idx)];
     if (m && !mats.some(x => x.content === m.content)) {
-      mats.unshift({ id: Date.now().toString() + Math.random(), content: m.content, tag: m.tag, date: today() });
+      mats.unshift({ id: Date.now().toString() + Math.random(), content: m.content, tag: m.tag, usage: m.usage || '', date: today() });
     }
   });
   saveMaterials(mats);
