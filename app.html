@@ -274,7 +274,10 @@ input:focus { outline: none; border-color: var(--gold); }
 
 /* ── TOPIC BANK ── */
 .bank-section-title { font-size:11px; font-weight:700; color:var(--gold); letter-spacing:.6px; text-transform:uppercase; padding:12px 0 5px; }
-.bank-item { background:var(--card); border-radius:10px; padding:12px 14px; display:flex; align-items:flex-start; gap:10px; margin-bottom:5px; }
+.bank-item { background:var(--card); border-radius:10px; padding:12px 14px; display:flex; align-items:flex-start; gap:10px; margin-bottom:5px; flex-wrap:wrap; }
+.bank-item-note { background:none; border:none; color:#555; font-size:13px; cursor:pointer; padding:2px 4px; flex-shrink:0; line-height:1; transition:color .15s; }
+.bank-item-note.has-note { color:var(--gold); }
+.topic-note-area { width:100%; margin-top:8px; padding-top:8px; border-top:1px solid #2a2a30; }
 .bank-item-text { flex:1; font-size:14px; line-height:1.5; }
 .bank-item-del { background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; padding:2px 0; flex-shrink:0; margin-top:2px; }
 .bank-item-practice { background:none; border:1px solid #444; border-radius:6px; color:var(--muted); font-size:12px; cursor:pointer; padding:3px 10px; flex-shrink:0; transition:all .15s; }
@@ -413,7 +416,7 @@ input:focus { outline: none; border-color: var(--gold); }
   <div id="scaffold-wrap" class="flex col gap-8">
     <div class="flex gap-8">
       <button class="btn btn-ghost" id="scaffold-btn" onclick="loadScaffold()" style="flex:1; font-size:14px;">💡 素材支架</button>
-      <button class="btn btn-ghost" onclick="openMyMaterials()" style="flex:1; font-size:14px;">📒 我的素材</button>
+      <button class="btn btn-ghost" id="my-mat-btn" onclick="openMyMaterials()" style="flex:1; font-size:14px;">📒 我的素材</button>
     </div>
     <div id="scaffold-out" style="display:none; background:var(--card); border-radius:12px; padding:14px 16px; font-size:14px; line-height:1.8;"></div>
     <div id="my-mat-out" style="display:none; background:var(--card); border-radius:12px; padding:14px 16px; font-size:14px; line-height:1.8;"></div>
@@ -888,8 +891,9 @@ input:focus { outline: none; border-color: var(--gold); }
   <!-- 搜索框 -->
   <div style="position:relative;">
     <input id="topics-search" type="search" placeholder="搜索题目关键词…" oninput="setTopicsSearch(this.value)"
-      style="width:100%;background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:9px 12px 9px 36px;box-sizing:border-box;outline:none;-webkit-appearance:none;">
+      style="width:100%;background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:9px 34px 9px 36px;box-sizing:border-box;outline:none;-webkit-appearance:none;">
     <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none;">🔍</span>
+    <button onclick="clearTopicsSearch()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 4px;line-height:1;" title="清除">×</button>
   </div>
 
   <!-- 类别标签栏 -->
@@ -1468,7 +1472,12 @@ function addPresetMaterial(idx) {
 
 function openMyMaterials() {
   const out = document.getElementById('my-mat-out');
-  if (out.style.display === 'block') { out.style.display = 'none'; return; }
+  const btn = document.getElementById('my-mat-btn');
+  if (out.style.display === 'block') {
+    out.style.display = 'none';
+    if (btn) btn.textContent = '📒 我的素材';
+    return;
+  }
   const mats = loadMaterials();
   if (!mats.length) {
     out.innerHTML = '<div class="muted" style="text-align:center;padding:10px 0;">素材本还是空的，<span style="color:var(--gold);cursor:pointer;" onclick="goMaterials()">去添加</span></div>';
@@ -1496,6 +1505,7 @@ function openMyMaterials() {
       ${m.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.7;margin-top:4px;">🏷 ${m.usage}</div>` : ''}
     </div>`).join('')}`;
   out.style.display = 'block';
+  if (btn) btn.textContent = '📒 我的素材 ×';
 }
 
 function loadCustomTopics() {
@@ -1711,9 +1721,11 @@ function renderTopicToReady(t, reason) {
   // 换题时重置素材支架
   document.getElementById('scaffold-out').style.display = 'none';
   document.getElementById('scaffold-out').innerHTML = '';
-  document.getElementById('scaffold-btn').style.display = 'block';
-  document.getElementById('scaffold-btn').textContent = '💡 素材支架——不知道说什么？点这里';
+  document.getElementById('scaffold-btn').textContent = '💡 素材支架';
   document.getElementById('scaffold-btn').disabled = false;
+  document.getElementById('my-mat-out').style.display = 'none';
+  const myBtn = document.getElementById('my-mat-btn');
+  if (myBtn) myBtn.textContent = '📒 我的素材';
   _scaffoldCache = {};
 }
 
@@ -1726,11 +1738,18 @@ async function loadScaffold() {
   const btn = document.getElementById('scaffold-btn');
   const out = document.getElementById('scaffold-out');
 
+  // 已展示则收起
+  if (out.style.display === 'block') {
+    out.style.display = 'none';
+    btn.textContent = '💡 素材支架';
+    return;
+  }
+
   // 已缓存直接展示
   if (_scaffoldCache[key]) {
     out.innerHTML = _scaffoldCache[key].html || _scaffoldCache[key];
     out.style.display = 'block';
-    btn.style.display = 'none';
+    btn.textContent = '💡 素材支架 ×';
     return;
   }
 
@@ -1772,7 +1791,8 @@ async function loadScaffold() {
     _scaffoldCache[key] = { html, items };
     out.innerHTML = html;
     out.style.display = 'block';
-    btn.style.display = 'none';
+    btn.textContent = '💡 素材支架 ×';
+    btn.disabled = false;
   } catch(e) {
     btn.textContent = '💡 素材支架';
     btn.disabled = false;
@@ -3726,12 +3746,75 @@ function setTopicsSearch(val) {
   renderTopicsPage();
 }
 
+function clearTopicsSearch() {
+  topicsSearch = '';
+  const inp = document.getElementById('topics-search');
+  if (inp) inp.value = '';
+  renderTopicsPage();
+}
+
 function goTopics() {
   topicsSearch = '';
   const inp = document.getElementById('topics-search');
   if (inp) inp.value = '';
   renderTopicsPage();
   show('s-topics');
+}
+
+function loadTopicNotes() {
+  try { return JSON.parse(ls('topic_notes') || '{}'); } catch(e) { return {}; }
+}
+function saveTopicNote(key, val) {
+  const notes = loadTopicNotes();
+  if (val.trim()) notes[key] = val.trim(); else delete notes[key];
+  ls('topic_notes', JSON.stringify(notes));
+}
+
+function noteBtn(text, notes) {
+  const has = !!notes[text];
+  const safe = text.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  return `<button class="bank-item-note${has ? ' has-note' : ''}" title="备注" onclick="toggleTopicNote(this,'${safe}')">✎</button>`;
+}
+
+function noteArea(text, notes) {
+  const val = notes[text] || '';
+  const safe = text.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  return `<div class="topic-note-area" style="display:none;" data-key="${safe}">
+    <textarea style="width:100%;background:var(--card2);border:1.5px solid #333;border-radius:8px;color:var(--text);font-size:13px;padding:8px 10px;resize:vertical;min-height:64px;font-family:inherit;box-sizing:border-box;">${val}</textarea>
+    <div class="flex gap-8" style="margin-top:6px;">
+      <button class="btn btn-gold btn-sm" style="flex:2;" onclick="saveTopicNoteFromArea(this)">保存</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="this.closest('.topic-note-area').style.display='none'">关闭</button>
+      ${val ? `<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);flex:1;" onclick="deleteTopicNoteFromArea(this)">删除</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function toggleTopicNote(btn, key) {
+  const item = btn.closest('.bank-item');
+  const area = item.querySelector('.topic-note-area');
+  if (!area) return;
+  const opening = area.style.display === 'none';
+  area.style.display = opening ? 'block' : 'none';
+}
+
+function saveTopicNoteFromArea(btn) {
+  const area = btn.closest('.topic-note-area');
+  const key = area.dataset.key;
+  const val = area.querySelector('textarea').value;
+  saveTopicNote(key, val);
+  area.style.display = 'none';
+  const noteButton = area.closest('.bank-item').querySelector('.bank-item-note');
+  if (noteButton) noteButton.classList.toggle('has-note', !!val.trim());
+}
+
+function deleteTopicNoteFromArea(btn) {
+  const area = btn.closest('.topic-note-area');
+  const key = area.dataset.key;
+  saveTopicNote(key, '');
+  area.querySelector('textarea').value = '';
+  area.style.display = 'none';
+  const noteButton = area.closest('.bank-item').querySelector('.bank-item-note');
+  if (noteButton) noteButton.classList.remove('has-note');
 }
 
 function practicedTopicSet() {
@@ -3760,6 +3843,7 @@ function renderTopicsPage() {
   const practiced = practicedTopicSet();
   const favs = loadFavorites();
   const customs = loadCustomTopics();
+  const notes = loadTopicNotes();
   const themes = [...new Set(TOPICS.map(t => t.theme))];
 
   // ── 搜索模式 ──
@@ -3788,9 +3872,11 @@ function renderTopicsPage() {
             <span style="display:block;margin-top:4px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
           </div>
           <div class="flex gap-6" style="flex-shrink:0;align-items:center;">
+            ${noteBtn(t.text, notes)}
             ${favBtn(t.text, favs)}
             ${practiceBtn}
           </div>
+          ${noteArea(t.text, notes)}
         </div>`;
       }).join('');
     }
@@ -3836,10 +3922,12 @@ function renderTopicsPage() {
         <div style="display:flex; align-items:center; gap:8px; width:100%;">
           <span class="theme-badge">${t.theme}</span>
           <span style="flex:1;"></span>
+          ${noteBtn(text, notes)}
           ${favBtn(text, favs)}
           <button class="bank-item-practice" data-favtext="${text.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" onclick="startFavoriteTopic(this.dataset.favtext)">练习</button>
         </div>
         <span style="font-size:14px; line-height:1.5;">${text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
+        ${noteArea(text, notes)}
       </div>`;
     }).join('');
   }
@@ -3856,9 +3944,11 @@ function renderTopicsPage() {
       return `<div class="bank-item${done ? ' practiced' : ''}">
         <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</div>
         <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
+          ${noteBtn(t.text, notes)}
           ${favBtn(t.text, favs)}
           <button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>
         </div>
+        ${noteArea(t.text, notes)}
       </div>`;
     }).join('');
   });
@@ -3875,10 +3965,12 @@ function renderTopicsPage() {
           <span style="display:block;margin-top:5px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
         </div>
         <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
+          ${noteBtn(t.text, notes)}
           ${favBtn(t.text, favs)}
           <button class="bank-item-practice" onclick="startCustomTopic(${i})">练习</button>
           <button class="bank-item-del" onclick="deleteCustomTopic(${i})">删除</button>
         </div>
+        ${noteArea(t.text, notes)}
       </div>`;
     }).join('');
   }
@@ -3894,9 +3986,11 @@ function renderTopicsPage() {
       return `<div class="bank-item${done ? ' practiced' : ''}">
         <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</div>
         <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
+          ${noteBtn(t.text, notes)}
           ${favBtn(t.text, favs)}
           <button class="bank-item-practice" onclick="startBuiltinTopic(${idx})">练习</button>
         </div>
+        ${noteArea(t.text, notes)}
       </div>`;
     }).join('');
   });
