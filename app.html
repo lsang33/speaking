@@ -830,16 +830,17 @@ input:focus { outline: none; border-color: var(--gold); }
 <!-- ═══ TOPICS BANK ═══ -->
 <!-- ═══ MATERIALS ═══ -->
 <div id="s-materials" class="screen flex col gap-14">
-  <div style="display:flex; align-items:center; gap:12px;">
+  <div style="display:flex; align-items:center; gap:8px;">
     <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
     <h2 style="flex:1; margin:0;">素材本</h2>
+    <button onclick="showExtractBox()" class="btn btn-ghost btn-sm">📄 提取</button>
     <button onclick="showAddMaterial()" class="btn btn-gold btn-sm">+ 添加</button>
   </div>
 
   <!-- 分类筛选 -->
   <div class="filter-bar" id="mat-filter-bar"></div>
 
-  <!-- 添加表单 -->
+  <!-- 手动添加表单 -->
   <div id="mat-add-box" class="card flex col gap-12" style="display:none;">
     <div style="font-size:14px; font-weight:600;">记录一条素材</div>
     <textarea id="mat-content" style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:10px 12px;width:100%;min-height:80px;resize:vertical;font-family:inherit;" placeholder="记下这条素材的核心——一个经历、一句话、一个案例…"></textarea>
@@ -848,6 +849,26 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="flex gap-8">
       <button class="btn btn-gold" style="flex:2;" onclick="saveMaterial()">保存</button>
       <button class="btn btn-ghost" style="flex:1;" onclick="hideAddMaterial()">取消</button>
+    </div>
+  </div>
+
+  <!-- 文章提取表单 -->
+  <div id="mat-extract-box" class="card flex col gap-12" style="display:none;">
+    <div style="font-size:14px; font-weight:600;">📄 从文章提取素材</div>
+    <div class="muted" style="font-size:12px;">粘贴一篇文章，AI 自动提取金句、数据、观察等素材（建议 3000 字以内）</div>
+    <textarea id="mat-article" style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:13px;padding:10px 12px;width:100%;min-height:140px;resize:vertical;font-family:inherit;" placeholder="粘贴文章内容…"></textarea>
+    <div class="flex gap-8">
+      <button class="btn btn-gold" style="flex:2;" id="mat-extract-btn" onclick="extractMaterials()">开始提取</button>
+      <button class="btn btn-ghost" style="flex:1;" onclick="hideExtractBox()">取消</button>
+    </div>
+    <!-- 提取结果确认区 -->
+    <div id="mat-extract-result" style="display:none;" class="flex col gap-8">
+      <div style="font-size:13px; font-weight:600; color:var(--gold);">勾选要保存的素材</div>
+      <div id="mat-extract-items" class="flex col gap-8"></div>
+      <div class="flex gap-8">
+        <button class="btn btn-gold" style="flex:2;" onclick="confirmExtracted()">保存选中</button>
+        <button class="btn btn-ghost" style="flex:1;" onclick="document.getElementById('mat-extract-result').style.display='none'">重新提取</button>
+      </div>
     </div>
   </div>
 
@@ -1175,6 +1196,7 @@ function renderMaterialsPage() {
           <span style="font-size:11px;color:var(--muted);">${m.date}</span>
         </div>
         <div style="font-size:14px;line-height:1.6;">${m.content}</div>
+        ${m.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.8;">🏷 ${m.usage}</div>` : ''}
         <button style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;text-align:left;padding:0;" onclick="deleteMaterial('${m.id}')">删除</button>
       </div>`).join('');
   } else if (matFilter === 'all') {
@@ -1197,6 +1219,7 @@ function renderMaterialsPage() {
           ${saved ? '<span style="font-size:11px;color:var(--gold);">已收入</span>' : `<button style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;" onclick="addPresetMaterial(${realIdx})">＋ 收入素材本</button>`}
         </div>
         <div style="font-size:14px;line-height:1.6;">${m.content}</div>
+        ${m.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.8;">🏷 ${m.usage}</div>` : ''}
       </div>`;
     }).join('');
   }
@@ -1246,6 +1269,117 @@ function deleteMaterial(id) {
   renderMaterialsPage();
 }
 
+function showExtractBox() {
+  hideAddMaterial();
+  document.getElementById('mat-extract-box').style.display = 'flex';
+  document.getElementById('mat-article').value = '';
+  document.getElementById('mat-extract-result').style.display = 'none';
+  document.getElementById('mat-extract-btn').textContent = '开始提取';
+  document.getElementById('mat-extract-btn').disabled = false;
+}
+
+function hideExtractBox() {
+  document.getElementById('mat-extract-box').style.display = 'none';
+}
+
+async function extractMaterials() {
+  const article = document.getElementById('mat-article').value.trim();
+  if (!article) { alert('请先粘贴文章内容'); return; }
+  if (article.length > 4000) { alert('文章超过4000字，请适当裁剪后再提取'); return; }
+
+  const btn = document.getElementById('mat-extract-btn');
+  btn.textContent = '提取中…';
+  btn.disabled = true;
+
+  const prompt = `请从以下文章中提取可用于口才练习的素材。
+
+分类说明：
+- 金句观点：有力的观点、名人引语、可辩驳的论断
+- 社会观察：对社会现象或人物行为的具体描述与洞察
+- 数据案例：具体数字、真实事件、典型案例
+- 诗词名句：古诗词、成语、格言
+
+要求：
+1. 每类最多3条，总计不超过10条，只提取真正有价值的
+2. 每条精简为1-2句话，保留核心内容，去掉冗余
+3. 严格按以下格式输出，不要有任何其他内容：
+
+[金句观点]
+• 内容
+
+[社会观察]
+• 内容
+
+[数据案例]
+• 内容
+
+[诗词名句]
+• 内容
+
+没有该类素材则跳过该分类。
+
+文章：
+${article}`;
+
+  try {
+    const text = await callLLM(prompt, 800);
+    const parsed = parseExtracted(text);
+    if (!parsed.length) { alert('未能提取到有效素材，请尝试换一篇文章'); btn.textContent = '开始提取'; btn.disabled = false; return; }
+    renderExtractResult(parsed);
+  } catch(e) {
+    alert('提取失败：' + e.message);
+    btn.textContent = '开始提取';
+    btn.disabled = false;
+  }
+}
+
+function parseExtracted(text) {
+  const tagMap = { '金句观点': '金句观点', '社会观察': '社会观察', '数据案例': '数据案例', '诗词名句': '诗词名句' };
+  const results = [];
+  let currentTag = null;
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    for (const [key, tag] of Object.entries(tagMap)) {
+      if (trimmed.includes(`[${key}]`)) { currentTag = tag; break; }
+    }
+    if (currentTag && (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*'))) {
+      const content = trimmed.replace(/^[•\-*]\s*/, '').trim();
+      if (content.length > 5) results.push({ tag: currentTag, content });
+    }
+  }
+  return results;
+}
+
+function renderExtractResult(items) {
+  const el = document.getElementById('mat-extract-items');
+  el.innerHTML = items.map((m, i) => `
+    <label style="display:flex;align-items:flex-start;gap:10px;background:var(--card2);border-radius:10px;padding:10px 12px;cursor:pointer;">
+      <input type="checkbox" checked data-idx="${i}" style="margin-top:3px;flex-shrink:0;accent-color:var(--gold);">
+      <div>
+        <div style="font-size:11px;color:var(--gold);margin-bottom:4px;">${MAT_ICONS[m.tag] || ''} ${m.tag}</div>
+        <div style="font-size:13px;line-height:1.6;">${m.content}</div>
+      </div>
+    </label>`).join('');
+  document.getElementById('mat-extract-result').style.display = 'flex';
+  document.getElementById('mat-extract-result')._items = items;
+}
+
+function confirmExtracted() {
+  const items = document.getElementById('mat-extract-result')._items;
+  const checked = [...document.querySelectorAll('#mat-extract-items input[type=checkbox]:checked')];
+  if (!checked.length) { alert('请至少勾选一条素材'); return; }
+  const mats = loadMaterials();
+  checked.forEach(cb => {
+    const m = items[parseInt(cb.dataset.idx)];
+    if (m && !mats.some(x => x.content === m.content)) {
+      mats.unshift({ id: Date.now().toString() + Math.random(), content: m.content, tag: m.tag, date: today() });
+    }
+  });
+  saveMaterials(mats);
+  hideExtractBox();
+  renderMaterialsPage();
+}
+
 function addPresetMaterial(idx) {
   const m = PRESET_MATERIALS[idx];
   if (!m) return;
@@ -1283,6 +1417,7 @@ function openMyMaterials() {
     <div style="padding:8px 0;border-bottom:1px solid #222;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${MAT_ICONS[m.tag] || ''} ${m.tag}${m.mine ? '' : ' · 示例'}</div>
       <div style="font-size:13px;line-height:1.6;">${m.content}</div>
+      ${m.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.7;margin-top:4px;">🏷 ${m.usage}</div>` : ''}
     </div>`).join('')}`;
   out.style.display = 'block';
 }
@@ -1416,8 +1551,24 @@ function switchHomeTopicMode(e) {
 }
 
 function retryTopic() {
-  // 保留当前 topic/mode，直接跳倒计时
   startCountdown();
+}
+
+function retryHistSession(id) {
+  const h = allSessions.find(s => s.id === id);
+  if (!h) return;
+  S.mode = h.mode || 'topic';
+  if (h.mode === 'word') {
+    S.words = h.words || [];
+    S.wordCount = h.words ? h.words.length : S.wordCount;
+  } else if (h.mode === 'story') {
+    S.storyCategory = h.storyCategory || 'movie';
+    S.storyTitle = h.storyTitle || '';
+  }
+  S.topic = { text: h.topic, theme: h.theme, d: 2 };
+  if (h.mode === 'word') { goWordReady(); }
+  else if (h.mode === 'story') { goStorySetup(); }
+  else { goReady(); }
 }
 
 function goHome() {
@@ -1501,7 +1652,7 @@ async function loadScaffold() {
 
   // 已缓存直接展示
   if (_scaffoldCache[key]) {
-    out.innerHTML = _scaffoldCache[key];
+    out.innerHTML = _scaffoldCache[key].html || _scaffoldCache[key];
     out.style.display = 'block';
     btn.style.display = 'none';
     return;
@@ -1510,22 +1661,40 @@ async function loadScaffold() {
   btn.textContent = '生成中…';
   btn.disabled = true;
 
-  const prompt = `你是口才训练教练。学员拿到一道练习题，但不知道说什么内容。
-请为这道题提供「素材支架」：3个不同的切入角度，每个角度包含：
-① 角度名称（4字以内）
-② 一个引导问题（帮学员回忆自己的亲身经历或观察，不要给答案，只是引导）
-③ 一句话说明这个角度怎么展开
+  const prompt = `你是口才训练教练。请为下面这道口才练习题提供3个切入角度的素材，格式严格如下（不要有其他内容）：
 
-注意：不要直接给示范答案，只帮学员找到自己的素材。语言简洁，每个角度不超过3行。
+[角度一] 角度名称（4字以内）
+内容：3-4句话的实质性素材，包含具体场景或论点、背后洞察、可延伸方向
+用法：适合xxx / 谈xxx / 升华xxx
+
+[角度二] 角度名称（4字以内）
+内容：3-4句话的实质性素材，包含具体场景或论点、背后洞察、可延伸方向
+用法：适合xxx / 谈xxx / 升华xxx
+
+[角度三] 角度名称（4字以内）
+内容：3-4句话的实质性素材，包含具体场景或论点、背后洞察、可延伸方向
+用法：适合xxx / 谈xxx / 升华xxx
+
+要求：内容要有实质性，可直接复用，不要只给引导问题。
 
 题目：${topic.text}`;
 
   try {
-    const text = await callLLM(prompt, 400);
-    const html = text.trim().replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>');
-    const formatted = `<p>${html}</p>`;
-    _scaffoldCache[key] = formatted;
-    out.innerHTML = formatted;
+    const text = await callLLM(prompt, 600);
+    const items = parseScaffold(text);
+    const html = items.length
+      ? items.map((item, i) => `
+        <div style="${i > 0 ? 'border-top:1px solid #222;margin-top:12px;padding-top:12px;' : ''}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span class="label">${item.name}</span>
+            <button style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;" onclick="saveScaffoldItem(${i})">＋ 存入素材本</button>
+          </div>
+          <div style="font-size:14px;line-height:1.7;">${item.content}</div>
+          ${item.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.8;margin-top:6px;">🏷 ${item.usage}</div>` : ''}
+        </div>`).join('')
+      : `<p>${text.trim().replace(/\n/g, '<br>')}</p>`;
+    _scaffoldCache[key] = { html, items };
+    out.innerHTML = html;
     out.style.display = 'block';
     btn.style.display = 'none';
   } catch(e) {
@@ -1533,6 +1702,40 @@ async function loadScaffold() {
     btn.disabled = false;
     alert('获取失败：' + e.message);
   }
+}
+
+function parseScaffold(text) {
+  const items = [];
+  const blocks = text.split(/\[角度[一二三1-3]\]/);
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed) continue;
+    const nameMatch = trimmed.match(/^(.{1,10})/);
+    const contentMatch = trimmed.match(/内容[：:]\s*([\s\S]*?)(?=用法[：:]|$)/);
+    const usageMatch = trimmed.match(/用法[：:]\s*(.+)/);
+    if (!contentMatch) continue;
+    items.push({
+      name: nameMatch ? nameMatch[1].trim().replace(/内容.*/, '').trim() : '角度',
+      content: contentMatch[1].trim().replace(/\n/g, ' '),
+      usage: usageMatch ? usageMatch[1].trim() : '',
+    });
+  }
+  return items;
+}
+
+function saveScaffoldItem(idx) {
+  const key = S.topic ? S.topic.text : '';
+  const cache = _scaffoldCache[key];
+  if (!cache || !cache.items) return;
+  const item = cache.items[idx];
+  if (!item) return;
+  const mats = loadMaterials();
+  if (mats.some(m => m.content === item.content)) { alert('已在素材本中'); return; }
+  mats.unshift({ id: Date.now().toString(), content: item.content, tag: '金句观点', usage: item.usage, date: today() });
+  saveMaterials(mats);
+  // 更新按钮状态
+  const btns = document.querySelectorAll('#scaffold-out button');
+  if (btns[idx]) { btns[idx].textContent = '已存入'; btns[idx].disabled = true; }
 }
 
 function switchToRecommendTopic() {
@@ -1737,8 +1940,9 @@ function renderHistList(sessions) {
           <div style="font-size:13px;color:var(--muted);line-height:1.65;background:var(--card2);border-radius:8px;padding:10px;">${h.transcript}</div>
         </div>` : ''}
 
-        <div style="margin-top:12px; padding-top:10px; border-top:1px solid #2a2a30;">
+        <div style="margin-top:12px; padding-top:10px; border-top:1px solid #2a2a30; display:flex; align-items:center; justify-content:space-between;">
           <button class="del-audio-btn" style="font-size:13px;" onclick="confirmDeleteSession('${h.id}');event.stopPropagation();">🗑 删除此记录</button>
+          <button class="btn btn-ghost btn-sm" onclick="retryHistSession('${h.id}');event.stopPropagation();" style="font-size:13px;">↩ 重试</button>
         </div>
       </div>
     </div>`;
