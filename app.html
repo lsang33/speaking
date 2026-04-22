@@ -3780,7 +3780,7 @@ function noteArea(text, notes) {
   const val = notes[text] || '';
   const safe = text.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
   return `<div class="topic-note-area" style="display:none;" data-key="${safe}">
-    <textarea style="width:100%;background:var(--card2);border:1.5px solid #333;border-radius:8px;color:var(--text);font-size:13px;padding:8px 10px;resize:vertical;min-height:64px;font-family:inherit;box-sizing:border-box;">${val}</textarea>
+    <textarea oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="width:100%;background:var(--card2);border:1.5px solid #333;border-radius:8px;color:var(--text);font-size:13px;padding:8px 10px;resize:none;min-height:64px;font-family:inherit;box-sizing:border-box;overflow:hidden;">${val}</textarea>
     <div class="flex gap-8" style="margin-top:6px;">
       <button class="btn btn-gold btn-sm" style="flex:2;" onclick="saveTopicNoteFromArea(this)">保存</button>
       <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="this.closest('.topic-note-area').style.display='none'">关闭</button>
@@ -3795,6 +3795,10 @@ function toggleTopicNote(btn, key) {
   if (!area) return;
   const opening = area.style.display === 'none';
   area.style.display = opening ? 'block' : 'none';
+  if (opening) {
+    const ta = area.querySelector('textarea');
+    if (ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
+  }
 }
 
 function saveTopicNoteFromArea(btn) {
