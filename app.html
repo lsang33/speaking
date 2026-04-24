@@ -612,6 +612,14 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
+  <!-- 优化发言 -->
+  <div class="example-section" id="optimize-section" style="display:none;">
+    <button onclick="toggleOptimize()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;" id="optimize-toggle-btn">优化版本 ▶</button>
+    <div id="optimize-expanded" style="display:none;margin-top:10px;">
+      <div class="example-body" id="optimize-text"></div>
+    </div>
+  </div>
+
   <!-- 调试面板 -->
   <div id="debug-panel" style="display:none;">
     <div style="background:#111; border-radius:var(--r); overflow:hidden;">
@@ -2055,6 +2063,12 @@ function renderHistList(sessions) {
           <div style="display:none;font-size:13px;color:var(--muted);line-height:1.65;background:var(--card2);border-radius:8px;padding:10px;">${h.transcript}</div>
         </div>` : ''}
 
+        ${h.optimized ? `
+        <div style="margin-top:8px;">
+          <button onclick="var d=this.nextElementSibling;var show=d.style.display==='none'||!d.style.display;d.style.display=show?'block':'none';this.textContent=show?'优化版 ▲':'优化版 ▶';event.stopPropagation();" style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;margin-bottom:6px;">优化版 ▶</button>
+          <div style="display:none;font-size:13px;color:var(--text);line-height:1.75;background:var(--card2);border-radius:8px;padding:10px;">${h.optimized.replace(/\n/g,'<br>')}</div>
+        </div>` : ''}
+
         <div style="margin-top:12px; padding-top:10px; border-top:1px solid #2a2a30; display:flex; align-items:center; justify-content:flex-end;">
           <button class="del-audio-btn" style="font-size:13px;" onclick="confirmDeleteSession('${h.id}');event.stopPropagation();">🗑 删除此记录</button>
         </div>
@@ -3089,7 +3103,8 @@ ${transcriptLabel}
 **明日聚焦**：[下次串联可尝试的一个具体技巧]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
-**鼓励**：[一句话，不超过15字]`;
+**鼓励**：[一句话，不超过15字]
+**优化版本**：[基于以上发言原文改写，保留说话者核心观点和例子，修正口头禅、重复和语序混乱，保持口语化，长度与原文相近。直接输出改写内容，不加任何标题或说明。]`;
   } else if (mode === 'story') {
     // ── 讲述模式模式 ──
     const catNameMap = { movie: '电影', book: '书籍', experience: '亲身经历', news: '新闻事件' };
@@ -3126,7 +3141,8 @@ ${transcriptLabel}
 **明日聚焦**：[下次讲述模式最应加强的一点，给出具体做法]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
-**鼓励**：[一句话，不超过15字]`;
+**鼓励**：[一句话，不超过15字]
+**优化版本**：[基于以上发言原文改写，保留说话者核心观点和例子，修正口头禅、重复和语序混乱，保持口语化，长度与原文相近。直接输出改写内容，不加任何标题或说明。]`;
   } else {
     // ── 普通题目模式 ──
     prompt = `你是口才训练教练，正在评估一位以央视主持人大赛为目标的学员。${asrAccurateNote}
@@ -3160,17 +3176,20 @@ ${transcriptLabel}
 **明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
-**鼓励**：[一句话，不超过15字]`;
+**鼓励**：[一句话，不超过15字]
+**优化版本**：[基于以上发言原文改写，保留说话者核心观点和例子，修正口头禅、重复和语序混乱，保持口语化，长度与原文相近。直接输出改写内容，不加任何标题或说明。]`;
   }
 
   try {
     S.debugLastPrompt = prompt;
     S.debugLastResponse = '';
-    const evalText = await callLLM(prompt);
+    const evalText = await callLLM(prompt, 1500);
     S.debugLastResponse = evalText;
 
     const scoreM = evalText.match(/\*\*评分\*\*[：:]\s*(\d+)/);
     const score = scoreM ? scoreM[1] : '—';
+    const optimizedM = evalText.match(/\*\*优化版本\*\*[：:]([\s\S]*?)$/);
+    const optimized = optimizedM ? optimizedM[1].trim() : '';
 
     const session = {
       id: S.sessionId,
@@ -3188,6 +3207,7 @@ ${transcriptLabel}
       transcript: S.transcript,
       evaluation: evalText,
       score,
+      optimized,
       metrics: analyzeTranscript(S.transcript, duration),
       audioMetrics: S.audioMetrics,
     };
@@ -3318,6 +3338,16 @@ function showResult(session, evalText) {
   document.getElementById('example-loading').style.display = 'none';
   document.getElementById('example-btn').style.display = 'block';
   document.getElementById('example-section').style.display = session.mode === 'story' ? 'none' : 'block';
+
+  // 重置优化发言区
+  document.getElementById('optimize-expanded').style.display = 'none';
+  document.getElementById('optimize-toggle-btn').textContent = '优化版本 ▶';
+  if (session.optimized) {
+    document.getElementById('optimize-text').innerHTML = formatExample(session.optimized);
+    document.getElementById('optimize-section').style.display = 'block';
+  } else {
+    document.getElementById('optimize-section').style.display = 'none';
+  }
 
   show('s-result');
 }
@@ -3572,6 +3602,14 @@ ${style.desc}
   } finally {
     loading.style.display = 'none';
   }
+}
+
+function toggleOptimize() {
+  const expanded = document.getElementById('optimize-expanded');
+  const btn = document.getElementById('optimize-toggle-btn');
+  const open = expanded.style.display === 'none';
+  expanded.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '优化版本 ▲' : '优化版本 ▶';
 }
 
 function formatExample(text) {
