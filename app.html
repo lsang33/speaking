@@ -556,8 +556,9 @@ input:focus { outline: none; border-color: var(--gold); }
     录音完成后点击下方按钮，<strong>手动输入</strong>你说了什么。
   </div>
 
-  <div class="mt-auto">
+  <div class="mt-auto flex col gap-10">
     <button class="btn btn-red" onclick="stopRec()">完成，获取 AI 评估</button>
+    <button class="btn btn-ghost" onclick="cancelRec()">取消，重新来过</button>
   </div>
 </div>
 
@@ -2068,7 +2069,12 @@ function renderHistList(sessions) {
         </div>` : ''}
 
         ${sections.length ? `<div class="eval-merged" style="margin-top:${hasAudio ? 10 : 0}px;">
-          ${sections.map(s => `<div class="eval-sect"><span class="label">${s.icon} ${s.k}</span><p>${s.text}</p></div>`).join('')}
+          ${sections.map(s => {
+            const txt = s.k === '口误标记'
+              ? s.text.split(/[；;]/).map(t => t.trim()).filter(Boolean).join('<br>')
+              : s.text;
+            return `<div class="eval-sect"><span class="label">${s.icon} ${s.k}</span><p>${txt}</p></div>`;
+          }).join('')}
         </div>` : ''}
 
         ${cheer ? `<div style="margin-top:10px;background:var(--card2);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--gold);text-align:center;">${cheer}</div>` : ''}
@@ -2894,6 +2900,23 @@ function startSR() {
   try { r.start(); } catch (e) {}
 }
 
+async function cancelRec() {
+  S.isRecording = false;
+  clearInterval(S.timerRef);
+  S.timerRef = null;
+  if (S.recognition) { try { S.recognition.stop(); } catch(e) {} S.recognition = null; }
+  if (S._analyserCtx) { try { S._analyserCtx.close(); } catch(e) {} S._analyserCtx = null; }
+  S._getRealtimeMetrics = null;
+  if (S.mediaRecorder && S.mediaRecorder.state !== 'inactive') {
+    try { S.mediaRecorder.stop(); } catch(e) {}
+  }
+  if (S.mediaStream) { S.mediaStream.getTracks().forEach(t => t.stop()); S.mediaStream = null; }
+  S.mediaRecorder = null;
+  S.audioChunks = [];
+  S.transcript = '';
+  goReady();
+}
+
 async function stopRec() {
   S.isRecording = false;
   clearInterval(S.timerRef);
@@ -3329,7 +3352,11 @@ function showResult(session, evalText) {
   sects.forEach(({ k, icon }) => {
     const m = evalText.match(new RegExp(`\\*\\*${k}\\*\\*[：:]([\\s\\S]*?)(?=\\*\\*|$)`));
     if (!m) return;
-    sectHtml += `<div class="eval-sect"><span class="label">${icon} ${k}</span><p>${m[1].trim()}</p></div>`;
+    const rawText = m[1].trim();
+    const formatted = k === '口误标记'
+      ? rawText.split(/[；;]/).map(s => s.trim()).filter(Boolean).join('<br>')
+      : rawText;
+    sectHtml += `<div class="eval-sect"><span class="label">${icon} ${k}</span><p>${formatted}</p></div>`;
   });
 
   // 评分理由段
