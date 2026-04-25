@@ -162,6 +162,9 @@ input:focus { outline: none; border-color: var(--gold); }
 }
 
 /* ── SETTINGS ── */
+#cfg-enable-optimize:checked + span { background: var(--gold) !important; }
+#cfg-enable-optimize:checked + span::after { transform: translateX(18px); }
+#optimize-toggle-track::after { content:''; position:absolute; left:4px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
 .type-btn {
   flex: 1; padding: 11px; border-radius: 10px;
   border: 1.5px solid #333; background: var(--card2);
@@ -813,6 +816,18 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
+  <!-- 优化发言 -->
+  <div class="flex" style="align-items:center; justify-content:space-between;">
+    <div>
+      <div class="label">评分后生成优化版本</div>
+      <div class="hint" style="font-size:12px; margin-top:2px;">关闭可加快评分速度</div>
+    </div>
+    <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+      <input type="checkbox" id="cfg-enable-optimize" style="opacity:0; width:0; height:0;">
+      <span onclick="document.getElementById('cfg-enable-optimize').click()" style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:13px;transition:.2s;" id="optimize-toggle-track"></span>
+    </label>
+  </div>
+
   <div class="mt-auto flex col gap-10">
     <button class="btn btn-gold" onclick="saveSettings()">保存</button>
     <button class="btn btn-ghost" style="color:var(--red);" onclick="confirmClearAll()">清空所有数据</button>
@@ -1112,6 +1127,7 @@ let S = {
   pauseThresh: parseInt(ls('pause_thresh') || '1000', 10),
   pausePenalty: parseInt(ls('pause_penalty') || '4000', 10),
   prepTime: parseInt(ls('prep_time') || '30', 10),
+  enableOptimize: ls('enable_optimize') !== '0',
   asrType: ls('asr_type') || 'browser',  // 'browser' | 'api'
   asrUrl:  ls('asr_url')  || '',
   asrKey:  ls('asr_key')  || '',
@@ -2274,6 +2290,7 @@ function goSettings() {
   document.getElementById('cfg-asr-url').value = S.asrUrl || '';
   document.getElementById('cfg-asr-key').value = S.asrKey || '';
   document.getElementById('cfg-asr-model').value = S.asrModel || '';
+  document.getElementById('cfg-enable-optimize').checked = S.enableOptimize;
   show('s-settings');
 }
 
@@ -2370,6 +2387,8 @@ function saveSettings() {
   if (S.asrType === 'api' && !asrUrl) { alert('请填写 ASR 地址'); return; }
   S.asrUrl = asrUrl; S.asrKey = asrKey; S.asrModel = asrModel;
   ls('asr_type', S.asrType); ls('asr_url', asrUrl); ls('asr_key', asrKey); ls('asr_model', asrModel);
+  S.enableOptimize = document.getElementById('cfg-enable-optimize').checked;
+  ls('enable_optimize', S.enableOptimize ? '1' : '0');
   goHome();
 }
 
@@ -3103,8 +3122,7 @@ ${transcriptLabel}
 **明日聚焦**：[下次串联可尝试的一个具体技巧]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
-**鼓励**：[一句话，不超过15字]
-**优化版本**：[基于以上发言原文改写，保留说话者核心观点和例子，修正口头禅、重复和语序混乱，保持口语化，长度与原文相近。直接输出改写内容，不加任何标题或说明。]`;
+**鼓励**：[一句话，不超过15字]`;
   } else if (mode === 'story') {
     // ── 讲述模式模式 ──
     const catNameMap = { movie: '电影', book: '书籍', experience: '亲身经历', news: '新闻事件' };
@@ -3141,8 +3159,7 @@ ${transcriptLabel}
 **明日聚焦**：[下次讲述模式最应加强的一点，给出具体做法]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
-**鼓励**：[一句话，不超过15字]
-**优化版本**：[基于以上发言原文改写，保留说话者核心观点和例子，修正口头禅、重复和语序混乱，保持口语化，长度与原文相近。直接输出改写内容，不加任何标题或说明。]`;
+**鼓励**：[一句话，不超过15字]`;
   } else {
     // ── 普通题目模式 ──
     prompt = `你是口才训练教练，正在评估一位以央视主持人大赛为目标的学员。${asrAccurateNote}
@@ -3176,14 +3193,15 @@ ${transcriptLabel}
 **明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
-**鼓励**：[一句话，不超过15字]
-**优化版本**：[基于以上发言原文改写，保留说话者核心观点和例子，修正口头禅、重复和语序混乱，保持口语化，长度与原文相近。直接输出改写内容，不加任何标题或说明。]`;
+**鼓励**：[一句话，不超过15字]`;
   }
 
   try {
+    const optimizeInstruction = `\n**优化版本**：[以说话者已表达的观点、例子和思路为唯一素材，不引入任何新内容，按9分标准重新组织表达：有清晰的开头点题、中间有层次的展开、结尾有力收束；去除口头禅和冗余，语言简洁有感染力，逻辑连贯自然；保持口语化，控制在与原文接近的时长内。直接输出改写内容，不加任何标题或说明。]`;
+    if (S.enableOptimize) prompt += optimizeInstruction;
     S.debugLastPrompt = prompt;
     S.debugLastResponse = '';
-    const evalText = await callLLM(prompt, 1500);
+    const evalText = await callLLM(prompt, S.enableOptimize ? 1500 : 800);
     S.debugLastResponse = evalText;
 
     const scoreM = evalText.match(/\*\*评分\*\*[：:]\s*(\d+)/);
