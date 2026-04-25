@@ -163,7 +163,7 @@ input:focus { outline: none; border-color: var(--gold); }
 
 /* ── SETTINGS ── */
 #cfg-enable-optimize:checked + span { background: var(--gold) !important; }
-#cfg-enable-optimize:checked + span::after { transform: translateX(18px); }
+#cfg-enable-optimize:checked + span::after { transform: translateY(-50%) translateX(18px); }
 #optimize-toggle-track::after { content:''; position:absolute; left:4px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
 .type-btn {
   flex: 1; padding: 11px; border-radius: 10px;
@@ -824,7 +824,7 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
     <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
       <input type="checkbox" id="cfg-enable-optimize" style="opacity:0; width:0; height:0;">
-      <span onclick="document.getElementById('cfg-enable-optimize').click()" style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:13px;transition:.2s;" id="optimize-toggle-track"></span>
+      <span style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:13px;transition:.2s;" id="optimize-toggle-track"></span>
     </label>
   </div>
 
