@@ -2071,7 +2071,7 @@ function renderHistList(sessions) {
         ${sections.length ? `<div class="eval-merged" style="margin-top:${hasAudio ? 10 : 0}px;">
           ${sections.map(s => {
             const txt = s.k === '口误标记'
-              ? s.text.split(/[；;]/).map(t => t.trim()).filter(Boolean).join('<br>')
+              ? s.text.split(/[；;\n]/).map(t => t.replace(/^\d+[.、]\s*/, '').trim()).filter(Boolean).join('<br>')
               : s.text;
             return `<div class="eval-sect"><span class="label">${s.icon} ${s.k}</span><p>${txt}</p></div>`;
           }).join('')}
@@ -3101,7 +3101,7 @@ async function evaluate() {
     ? '\n注意：本次转写由高精度 ASR 完成，文本如实记录了口误和磕巴。评估时请严格区分真口误与合法表达——以下不算口误也不应扣分：①汉语正常叠词（往往、常常、件件、生生不息等）；②跨词边界的字重叠（如「便利店」+「店员」）；③成语固定搭配。只有无意义重复（「我我觉得」）、说错自纠、明显磕巴才算口误。'
     : '';
   const slipSection = hasPunctuation
-    ? '\n**口误标记**：[只列出真实口误。判断标准——①自我纠正：转写中不会出现箭头，纠正表现为两个相邻词，前者语义不通或发音相近但用错（如「时动生动」中「时动」不是真实词语，紧跟正确词「生动」，说明说错了立刻纠正）；②无意义重复（如「我我觉得」「就是就是」）；③明显磕巴卡壳。绝对不标记：叠词（往往、件件、生生不息）、跨词边界字重叠（便利店+店员）、成语固定搭配。格式：「原文片段」→ 简述；无则填"无"]'
+    ? '\n**口误标记**：[只列出真实口误。判断标准——①自我纠正：转写中不会出现箭头，纠正表现为两个相邻词，前者语义不通或发音相近但用错（如「时动生动」中「时动」不是真实词语，紧跟正确词「生动」，说明说错了立刻纠正）；②无意义重复（如「我我觉得」「就是就是」）；③明显磕巴卡壳。绝对不标记：叠词（往往、件件、生生不息）、跨词边界字重叠（便利店+店员）、成语固定搭配。格式：每条单独一行，写「原文片段」→ 简述；无口误则只写"无"]'
     : '';
 
   let prompt;
@@ -3220,7 +3220,7 @@ ${transcriptLabel}
   }
 
   try {
-    const optimizeInstruction = `\n**优化版本**：[以说话者已表达的观点、例子和思路为唯一素材，按9分标准重新组织表达：有清晰的开头点题、中间有层次的展开、结尾有力收束；去除口头禅和冗余，语言简洁有感染力，逻辑连贯自然；保持口语化；字数目标250-350字（对应口播约90-120秒），若原文内容不足则在说话者思路范围内适当充实细节和过渡。直接输出改写内容，不加任何标题或说明。]`;
+    const optimizeInstruction = `\n**优化版本**：[以说话者已表达的观点和思路为核心，在此基础上将表达发挥到最佳水准：有清晰的开头点题、中间有层次的展开、结尾有力收束；去除口头禅和冗余，语言简洁有感染力，逻辑连贯自然；保持口语化。允许围绕说话者已有的观点延伸细节、补充具体例子、加强论证，但不得引入说话者完全未提及的全新论点。字数目标500-700字（对应口播约2-3分钟）。直接输出改写内容，不加任何标题或说明。]`;
     if (S.enableOptimize) prompt += optimizeInstruction;
     S.debugLastPrompt = prompt;
     S.debugLastResponse = '';
@@ -3354,7 +3354,7 @@ function showResult(session, evalText) {
     if (!m) return;
     const rawText = m[1].trim();
     const formatted = k === '口误标记'
-      ? rawText.split(/[；;]/).map(s => s.trim()).filter(Boolean).join('<br>')
+      ? rawText.split(/[；;\n]/).map(s => s.replace(/^\d+[.、]\s*/, '').trim()).filter(Boolean).join('<br>')
       : rawText;
     sectHtml += `<div class="eval-sect"><span class="label">${icon} ${k}</span><p>${formatted}</p></div>`;
   });
