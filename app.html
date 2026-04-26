@@ -624,6 +624,12 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
+  <!-- 转写原文 -->
+  <div id="res-transcript-section" style="display:none;">
+    <button onclick="var d=this.nextElementSibling;var open=d.style.display==='none';d.style.display=open?'block':'none';this.textContent=open?'📝 转写原文 ▲':'📝 转写原文 ▶';" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:0;">📝 转写原文 ▶</button>
+    <div id="res-transcript-text" style="display:none;margin-top:8px;font-size:13px;color:var(--muted);line-height:1.65;background:var(--card2);border-radius:8px;padding:10px;"></div>
+  </div>
+
   <!-- 调试面板 -->
   <div id="debug-panel" style="display:none;">
     <div style="background:#111; border-radius:var(--r); overflow:hidden;">
@@ -3431,6 +3437,18 @@ function showResult(session, evalText) {
   document.getElementById('example-loading').style.display = 'none';
   document.getElementById('example-btn').style.display = 'block';
   document.getElementById('example-section').style.display = session.mode === 'story' ? 'none' : 'block';
+
+  // 转写原文
+  const txSection = document.getElementById('res-transcript-section');
+  const txText = document.getElementById('res-transcript-text');
+  if (session.transcript) {
+    txText.innerHTML = highlightSlips(session.transcript, session.evaluation, session.metrics);
+    txSection.style.display = 'block';
+    txText.style.display = 'none';
+    txSection.querySelector('button').textContent = '📝 转写原文 ▶';
+  } else {
+    txSection.style.display = 'none';
+  }
 
   // 重置优化发言区
   document.getElementById('optimize-expanded').style.display = 'none';
