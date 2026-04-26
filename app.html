@@ -1875,6 +1875,7 @@ function switchToRecommendTopic() {
   renderTopicToReady(topic, reason);
   document.getElementById('prep-timer-box').style.display = 'none';
   document.getElementById('prep-skip-btn').style.display = 'none';
+  document.getElementById('ready-start-btn').style.display = 'block';
   document.getElementById('ready-start-btn').textContent = '准备好了，开始录音';
 }
 
@@ -1889,7 +1890,9 @@ function goReady() {
   cancelPrepTimer();
   document.getElementById('prep-timer-box').style.display = 'none';
   document.getElementById('prep-skip-btn').style.display = 'none';
-  document.getElementById('ready-start-btn').textContent = '准备好了，开始录音';
+  const readyBtn = document.getElementById('ready-start-btn');
+  readyBtn.style.display = 'block';
+  readyBtn.textContent = '准备好了，开始录音';
   show('s-ready');
 }
 
@@ -2049,6 +2052,7 @@ function parseEvalSections(evalText) {
   const keys = [
     { k: '叙事结构', icon: '📖' },
     { k: '细节生动性', icon: '🎨' },
+    { k: '词语串联', icon: '🔗' },
     { k: '逻辑结构', icon: '🧩' },
     { k: '语言流畅度', icon: '🗣' },
 
@@ -3337,14 +3341,20 @@ function showResult(session, evalText) {
       { k: '叙事结构', icon: '📖' },
       { k: '细节生动性', icon: '🎨' },
       { k: '语言流畅度', icon: '🗣' },
-  
+      { k: '明日聚焦', icon: '🎯' },
+      ...slipSect,
+    ]
+    : session.mode === 'word'
+    ? [
+      { k: '词语串联', icon: '🔗' },
+      { k: '逻辑结构', icon: '🧩' },
+      { k: '语言流畅度', icon: '🗣' },
       { k: '明日聚焦', icon: '🎯' },
       ...slipSect,
     ]
     : [
       { k: '逻辑结构', icon: '🧩' },
       { k: '语言流畅度', icon: '🗣' },
-  
       { k: '明日聚焦', icon: '🎯' },
       ...slipSect,
     ];
@@ -3443,7 +3453,7 @@ function showResult(session, evalText) {
     txText.innerHTML = highlightSlips(session.transcript, session.evaluation, session.metrics);
     txSection.style.display = 'block';
     txText.style.display = 'none';
-    txSection.querySelector('button').textContent = '📝 转写原文 ▶';
+    txSection.querySelector('button').textContent = '转写原文 ▶';
   } else {
     txSection.style.display = 'none';
   }
@@ -3862,6 +3872,7 @@ function pickTopic(i) {
   cancelPrepTimer();
   document.getElementById('prep-timer-box').style.display = 'none';
   document.getElementById('prep-skip-btn').style.display = 'none';
+  document.getElementById('ready-start-btn').style.display = 'block';
   document.getElementById('ready-start-btn').textContent = '准备好了，开始录音';
   closePicker();
 }
@@ -3879,6 +3890,7 @@ function pickRandom() {
   cancelPrepTimer();
   document.getElementById('prep-timer-box').style.display = 'none';
   document.getElementById('prep-skip-btn').style.display = 'none';
+  document.getElementById('ready-start-btn').style.display = 'block';
   document.getElementById('ready-start-btn').textContent = '准备好了，开始录音';
   closePicker();
 }
