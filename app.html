@@ -1879,11 +1879,7 @@ function switchToRecommendTopic() {
 }
 
 function onReadyStart() {
-  if (S.prepTime > 0) {
-    startPrepTimer();
-  } else {
-    startCountdown();
-  }
+  if (S.prepTime > 0) { startPrepTimer(); } else { startCountdown(); }
 }
 
 function goReady() {
@@ -2726,14 +2722,14 @@ function startPrepTimer() {
   numEl.textContent = remaining;
   box.style.display = 'block';
   skipBtn.style.display = 'block';
-  startBtn.textContent = '现在开始录音';
+  startBtn.style.display = 'none';
 
   S.prepTimerRef = setInterval(() => {
     remaining--;
     numEl.textContent = remaining;
     if (remaining <= 0) {
       cancelPrepTimer();
-      // 自动进入录音倒计时
+      startBtn.style.display = 'block';
       startCountdown();
     }
   }, 1000);
