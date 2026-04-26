@@ -1999,6 +1999,7 @@ function setHistFilter(theme) {
 
 function highlightSlips(transcript, evaluation, metrics) {
   if (!transcript) return transcript;
+  try {
   let result = transcript;
 
   // 口误高亮（金色，只标第一次出现）
@@ -2038,6 +2039,7 @@ function highlightSlips(transcript, evaluation, metrics) {
   }
 
   return result;
+  } catch(e) { return transcript; }
 }
 
 function parseEvalSections(evalText) {
@@ -2117,7 +2119,7 @@ function renderHistList(sessions) {
         ${sections.length ? `<div class="eval-merged" style="margin-top:${hasAudio ? 10 : 0}px;">
           ${sections.map(s => {
             const txt = s.k === '口误标记'
-              ? s.text.split(/[；;\n]/).map(t => t.replace(/^\d+[.、]\s*/, '').trim()).filter(Boolean).join('<br>')
+              ? s.text.split(/[；;\n]/).map(t => t.replace(/^[\s·•\-\*\d]+[.、\s]*/, '').trim()).filter(t => t && t !== '无').map(t => `· ${t}`).join('<br>') || '无'
               : s.text;
             return `<div class="eval-sect"><span class="label">${s.icon} ${s.k}</span><p>${txt}</p></div>`;
           }).join('')}
@@ -3400,7 +3402,7 @@ function showResult(session, evalText) {
     if (!m) return;
     const rawText = m[1].trim();
     const formatted = k === '口误标记'
-      ? rawText.split(/[；;\n]/).map(s => s.replace(/^\d+[.、]\s*/, '').trim()).filter(s => s && s !== '无').map(s => `· ${s}`).join('<br>') || '无'
+      ? rawText.split(/[；;\n]/).map(s => s.replace(/^[\s·•\-\*\d]+[.、\s]*/, '').trim()).filter(s => s && s !== '无').map(s => `· ${s}`).join('<br>') || '无'
       : rawText;
     sectHtml += `<div class="eval-sect"><span class="label">${icon} ${k}</span><p>${formatted}</p></div>`;
   });
