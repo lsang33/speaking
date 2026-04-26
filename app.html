@@ -1997,6 +1997,49 @@ function setHistFilter(theme) {
   renderHistList(filtered);
 }
 
+function highlightSlips(transcript, evaluation, metrics) {
+  if (!transcript) return transcript;
+  let result = transcript;
+
+  // 口误高亮（金色，只标第一次出现）
+  if (evaluation) {
+    const m = evaluation.match(/\*\*口误标记\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
+    if (m) {
+      const slipText = m[1].trim();
+      if (slipText && slipText !== '无') {
+        const re = /「([^」]+)」/g;
+        let match;
+        while ((match = re.exec(slipText)) !== null) {
+          const phrase = match[1];
+          if (phrase.length < 2) continue;
+          const st = 'color:var(--gold);background:rgba(212,168,67,.15);border-radius:3px;padding:0 2px;';
+          let found = false;
+          result = result.replace(/(<[^>]+>)|([^<]+)/g, (seg, tag, text) => {
+            if (tag) return tag;
+            if (found) return text;
+            const idx = text.indexOf(phrase);
+            if (idx < 0) return text;
+            found = true;
+            return text.slice(0, idx) + `<span style="${st}">${phrase}</span>` + text.slice(idx + phrase.length);
+          });
+        }
+      }
+    }
+  }
+
+  // 口头禅高亮（红色），跳过已有 span 内部
+  if (metrics?.fillerCounts) {
+    const st = 'color:#e57373;background:rgba(229,115,115,.12);border-radius:3px;padding:0 2px;';
+    Object.keys(metrics.fillerCounts).forEach(word => {
+      result = result.replace(/(<[^>]+>)|([^<]+)/g, (m, tag, text) =>
+        tag ? tag : text.split(word).join(`<span style="${st}">${word}</span>`)
+      );
+    });
+  }
+
+  return result;
+}
+
 function parseEvalSections(evalText) {
   if (!evalText) return [];
   const keys = [
@@ -2004,7 +2047,7 @@ function parseEvalSections(evalText) {
     { k: '细节生动性', icon: '🎨' },
     { k: '逻辑结构', icon: '🧩' },
     { k: '语言流畅度', icon: '🗣' },
-    { k: '本次亮点', icon: '✨' },
+
     { k: '明日聚焦', icon: '🎯' },
     { k: '口误标记', icon: '🔍' },
     { k: '评分理由', icon: '💬' },
@@ -2085,7 +2128,7 @@ function renderHistList(sessions) {
         ${h.transcript ? `
         <div style="margin-top:10px;">
           <button onclick="var d=this.nextElementSibling;var show=d.style.display==='none'||!d.style.display;d.style.display=show?'block':'none';this.textContent=show?'📝 转写原文 ▲':'📝 转写原文 ▶';event.stopPropagation();" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0;margin-bottom:6px;">📝 转写原文 ▶</button>
-          <div style="display:none;font-size:13px;color:var(--muted);line-height:1.65;background:var(--card2);border-radius:8px;padding:10px;">${h.transcript}</div>
+          <div style="display:none;font-size:13px;color:var(--muted);line-height:1.65;background:var(--card2);border-radius:8px;padding:10px;">${highlightSlips(h.transcript, h.evaluation, h.metrics)}</div>
         </div>` : ''}
 
         ${h.optimized ? `
@@ -3104,7 +3147,7 @@ async function evaluate() {
     ? '\n注意：本次转写由高精度 ASR 完成，文本如实记录了口误和磕巴。评估时请严格区分真口误与合法表达——以下不算口误也不应扣分：①汉语正常叠词（往往、常常、件件、生生不息等）；②跨词边界的字重叠（如「便利店」+「店员」）；③成语固定搭配。只有无意义重复（「我我觉得」）、说错自纠、明显磕巴才算口误。'
     : '';
   const slipSection = hasPunctuation
-    ? '\n**口误标记**：[只列出真实口误。判断标准——①自我纠正：转写中不会出现箭头，纠正表现为两个相邻词，前者语义不通或发音相近但用错（如「时动生动」中「时动」不是真实词语，紧跟正确词「生动」，说明说错了立刻纠正）；②无意义重复（如「我我觉得」「就是就是」）；③明显磕巴卡壳。绝对不标记：叠词（往往、件件、生生不息）、跨词边界字重叠（便利店+店员）、成语固定搭配。格式：每条单独一行，写「原文片段」→ 简述；无口误则只写"无"]'
+    ? '\n**口误标记**：[只列出真实口误。判断标准——①自我纠正：转写中不会出现箭头，纠正表现为两个相邻词，前者语义不通或发音相近但用错（如「时动生动」中「时动」不是真实词语，紧跟正确词「生动」，说明说错了立刻纠正）；②无意义重复（如「我我觉得」「就是就是」）；③明显磕巴卡壳。绝对不标记：叠词（往往、件件、生生不息）、跨词边界字重叠（便利店+店员）、成语固定搭配。格式：每条单独一行，写「原文片段（至少3字，含前后上下文）」→ 简述；无口误则只写"无"]'
     : '';
 
   let prompt;
@@ -3144,7 +3187,7 @@ ${transcriptLabel}
 **词语串联**：[哪些词语用得自然？哪些生硬或遗漏？]
 **逻辑结构**：[有无完整的观点-论据-升华，衔接是否流畅]
 **语言流畅度**：[结合口头禅和停顿数据评价，停顿过多或有长停顿须指出]
-**本次亮点**：[最精彩的一句，直接引用原文]
+
 **明日聚焦**：[下次串联可尝试的一个具体技巧]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
@@ -3181,7 +3224,7 @@ ${transcriptLabel}
 **叙事结构**：[背景/冲突/转折/结局四要素是否完整？哪个环节最弱]
 **细节生动性**：[有无具体画面、细节或情感描写？是否流于抽象概括]
 **语言流畅度**：[结合口头禅和停顿数据评价，节奏是否自然]
-**本次亮点**：[最精彩的一句，直接引用原文]
+
 **明日聚焦**：[下次讲述模式最应加强的一点，给出具体做法]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
@@ -3215,7 +3258,7 @@ ${transcriptLabel}
 
 **逻辑结构**：[有无观点-论据-升华层次，结构是否完整]
 **语言流畅度**：[结合口头禅和停顿数据评价，口头禅点名，长停顿须指出]
-**本次亮点**：[最精彩的一句，直接引用原文]
+
 **明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
@@ -3288,14 +3331,14 @@ function showResult(session, evalText) {
       { k: '叙事结构', icon: '📖' },
       { k: '细节生动性', icon: '🎨' },
       { k: '语言流畅度', icon: '🗣' },
-      { k: '本次亮点', icon: '✨' },
+  
       { k: '明日聚焦', icon: '🎯' },
       ...slipSect,
     ]
     : [
       { k: '逻辑结构', icon: '🧩' },
       { k: '语言流畅度', icon: '🗣' },
-      { k: '本次亮点', icon: '✨' },
+  
       { k: '明日聚焦', icon: '🎯' },
       ...slipSect,
     ];
@@ -3357,7 +3400,7 @@ function showResult(session, evalText) {
     if (!m) return;
     const rawText = m[1].trim();
     const formatted = k === '口误标记'
-      ? rawText.split(/[；;\n]/).map(s => s.replace(/^\d+[.、]\s*/, '').trim()).filter(Boolean).map(s => `· ${s}`).join('<br>')
+      ? rawText.split(/[；;\n]/).map(s => s.replace(/^\d+[.、]\s*/, '').trim()).filter(s => s && s !== '无').map(s => `· ${s}`).join('<br>') || '无'
       : rawText;
     sectHtml += `<div class="eval-sect"><span class="label">${icon} ${k}</span><p>${formatted}</p></div>`;
   });
