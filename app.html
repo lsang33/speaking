@@ -625,9 +625,9 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
 
   <!-- 转写原文 -->
-  <div id="res-transcript-section" style="display:none;">
-    <button onclick="var d=this.nextElementSibling;var open=d.style.display==='none';d.style.display=open?'block':'none';this.textContent=open?'📝 转写原文 ▲':'📝 转写原文 ▶';" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:0;">📝 转写原文 ▶</button>
-    <div id="res-transcript-text" style="display:none;margin-top:8px;font-size:13px;color:var(--muted);line-height:1.65;background:var(--card2);border-radius:8px;padding:10px;"></div>
+  <div class="example-section" id="res-transcript-section" style="display:none;">
+    <button onclick="var d=this.nextElementSibling;var open=d.style.display==='none';d.style.display=open?'block':'none';this.textContent=open?'转写原文 ▲':'转写原文 ▶';" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;">转写原文 ▶</button>
+    <div id="res-transcript-text" style="display:none;margin-top:10px;font-size:13px;color:var(--muted);line-height:1.65;"></div>
   </div>
 
   <!-- 调试面板 -->
@@ -2187,9 +2187,11 @@ async function renderStorageInfo() {
   if (!navigator.storage?.estimate) { el.innerHTML = ''; return; }
   try {
     const { usage, quota } = await navigator.storage.estimate();
-    const usedMB = (usage / 1024 / 1024).toFixed(0);
+    const usedMB = usage / 1024 / 1024;
+    const usedStr = usedMB < 1 ? `${(usage / 1024).toFixed(0)} KB` : `${usedMB.toFixed(1)} MB`;
     const quotaGB = (quota / 1024 / 1024 / 1024).toFixed(1);
-    el.innerHTML = `<div class="muted" style="font-size:12px;">本地已用 ${usedMB} MB · 可用空间 ${quotaGB} GB</div>`;
+    const note = location.protocol === 'file:' ? '（本地文件模式，数值仅供参考）' : '';
+    el.innerHTML = `<div class="muted" style="font-size:12px;">本地已用 ${usedStr} · 可用空间 ${quotaGB} GB${note}</div>`;
   } catch(e) { el.innerHTML = ''; }
 }
 
