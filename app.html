@@ -872,7 +872,7 @@ input:focus { outline: none; border-color: var(--gold); }
   <div id="mat-add-box" class="card flex col gap-12" style="display:none;">
     <div style="font-size:14px; font-weight:600;" id="mat-add-title">记录一条素材</div>
     <input type="hidden" id="mat-edit-id" value=""/>
-    <textarea id="mat-content" style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:10px 12px;width:100%;min-height:80px;resize:vertical;font-family:inherit;" placeholder="记下这条素材的核心——一个经历、一句话、一个案例…"></textarea>
+    <textarea id="mat-content" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:10px 12px;width:100%;min-height:80px;resize:none;font-family:inherit;overflow:hidden;box-sizing:border-box;" placeholder="记下这条素材的核心——一个经历、一句话、一个案例…"></textarea>
     <input id="mat-usage" type="text" placeholder="备注：适合用在哪里（可选）" style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:13px;padding:9px 12px;width:100%;box-sizing:border-box;outline:none;"/>
     <div class="flex gap-6" id="mat-tag-chips" style="flex-wrap:wrap;"></div>
     <input type="hidden" id="mat-tag" value="亲身经历"/>
@@ -1293,7 +1293,10 @@ function editMaterial(id) {
   document.getElementById('mat-add-box').style.display = 'flex';
   document.getElementById('mat-add-title').textContent = '编辑素材';
   document.getElementById('mat-edit-id').value = id;
-  document.getElementById('mat-content').value = m.content || '';
+  const ta = document.getElementById('mat-content');
+  ta.value = m.content || '';
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
   document.getElementById('mat-usage').value = m.usage || '';
   document.getElementById('mat-tag').value = m.tag || '亲身经历';
   document.getElementById('mat-tag-chips').innerHTML = MAT_TAGS.map(t =>
@@ -3354,7 +3357,7 @@ function showResult(session, evalText) {
     if (!m) return;
     const rawText = m[1].trim();
     const formatted = k === '口误标记'
-      ? rawText.split(/[；;\n]/).map(s => s.replace(/^\d+[.、]\s*/, '').trim()).filter(Boolean).join('<br>')
+      ? rawText.split(/[；;\n]/).map(s => s.replace(/^\d+[.、]\s*/, '').trim()).filter(Boolean).map(s => `· ${s}`).join('<br>')
       : rawText;
     sectHtml += `<div class="eval-sect"><span class="label">${icon} ${k}</span><p>${formatted}</p></div>`;
   });
