@@ -3004,7 +3004,19 @@ function startSR() {
   };
 
   r.onend = () => { if (S.isRecording) startSR(); };
-  r.onerror = e => { if (e.error !== 'aborted' && S.isRecording) setTimeout(startSR, 200); };
+  r.onerror = e => {
+    if (e.error === 'aborted') return;
+    // 'not-allowed' / 'service-not-allowed' / 'language-not-supported' 等不可恢复，提示用户
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'language-not-supported') {
+      const hint = document.getElementById('no-sr-hint');
+      if (hint) {
+        hint.style.display = 'block';
+        hint.innerHTML = `⚠️ 语音识别不可用（${e.error}）。<br>安卓 Edge/Firefox 不支持 Web Speech，请改用 Chrome，或在设置中切换到 API 识别。`;
+      }
+      return;
+    }
+    if (S.isRecording) setTimeout(startSR, 200);
+  };
 
   S.recognition = r;
   try { r.start(); } catch (e) {}
