@@ -2778,7 +2778,13 @@ function startCountdown() {
   if (navigator.mediaDevices && !S._permStream) {
     navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
       S._permStream = stream; // 保存 stream，beginRecording 直接复用
-    }).catch(() => { S._permStream = null; });
+      S._permError = null;
+    }).catch(err => {
+      S._permStream = null;
+      S._permError = err;
+    });
+  } else if (!navigator.mediaDevices) {
+    S._permError = { name: 'NoMediaDevices', message: '此环境不支持 mediaDevices（通常是非 HTTPS 或浏览器太旧）' };
   }
   show('s-countdown');
   let n = 3;
@@ -2812,7 +2818,10 @@ function releaseWakeLock() {
 }
 
 function startMediaRecorder() {
-  if (!window.MediaRecorder || !navigator.mediaDevices) return;
+  if (!window.MediaRecorder || !navigator.mediaDevices) {
+    showMicError({ name: 'NoMediaDevices', message: '此浏览器不支持 MediaRecorder/mediaDevices。请使用最新 Chrome、Edge 或 Firefox，并确保通过 HTTPS 访问。' });
+    return;
+  }
   acquireWakeLock();
   const streamPromise = S._permStream
     ? Promise.resolve(S._permStream)
@@ -2900,7 +2909,30 @@ function startMediaRecorder() {
         };
       }
     } catch(e) { /* AudioContext unavailable, skip real-time metrics */ }
-  }).catch(() => { /* mic permission denied, skip audio */ });
+  }).catch(err => {
+    showMicError(err);
+  });
+}
+
+function showMicError(err) {
+  const e = err || S._permError;
+  const name = e?.name || 'Unknown';
+  const msg = e?.message || '';
+  const hints = {
+    NotAllowedError: '麦克风权限被拒绝。请到浏览器站点设置中允许，或检查系统设置 → 应用 → Edge → 权限 → 麦克风。',
+    NotFoundError: '未检测到麦克风设备。',
+    NotReadableError: '麦克风被其他应用占用，请关闭其他正在使用麦克风的应用后重试。',
+    SecurityError: '安全限制：必须通过 HTTPS 访问（GitHub Pages 已是 HTTPS，请检查 URL）。',
+    AbortError: '获取麦克风过程被中止，请重试。',
+    NoMediaDevices: msg,
+  };
+  const hint = hints[name] || `错误：${name} ${msg}`;
+  const box = document.getElementById('tx-text');
+  if (box) {
+    box.innerHTML = `<span style="color:#e57373;">⚠️ 录音失败<br>${hint}</span>`;
+    box.style.color = '#e57373';
+  }
+  alert('录音失败：' + hint);
 }
 
 function stopMediaRecorder() {
