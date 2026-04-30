@@ -1812,21 +1812,24 @@ async function loadScaffold() {
   btn.textContent = '生成中…';
   btn.disabled = true;
 
-  const prompt = `你是口才训练教练。请为下面这道口才练习题提供3个切入角度的素材，格式严格如下（不要有其他内容）：
+  const prompt = `你是口才训练教练。请为下面这道口才练习题提供3个切入思路，格式严格如下（不要有其他内容）：
 
-[角度一] 角度名称（4字以内）
-内容：3-4句话的实质性素材，包含具体场景或论点、背后洞察、可延伸方向
-用法：适合xxx / 谈xxx / 升华xxx
+[思路一] 思路名称（4字以内）
+内容：2-3句话展开这个思路的核心观点，有实质内容，可以直接说出口
+金句：「金句内容」— 来源（人名或朝代+人名）；如有多句用分号隔开；无合适金句则写"无"
 
-[角度二] 角度名称（4字以内）
-内容：3-4句话的实质性素材，包含具体场景或论点、背后洞察、可延伸方向
-用法：适合xxx / 谈xxx / 升华xxx
+[思路二] 思路名称（4字以内）
+内容：2-3句话展开这个思路的核心观点，有实质内容，可以直接说出口
+金句：「金句内容」— 来源；无则写"无"
 
-[角度三] 角度名称（4字以内）
-内容：3-4句话的实质性素材，包含具体场景或论点、背后洞察、可延伸方向
-用法：适合xxx / 谈xxx / 升华xxx
+[思路三] 思路名称（4字以内）
+内容：2-3句话展开这个思路的核心观点，有实质内容，可以直接说出口
+金句：「金句内容」— 来源；无则写"无"
 
-要求：内容要有实质性，可直接复用，不要只给引导问题。
+要求：
+- 三个思路必须角度不同，不能都是正面论述，可以有反常识、辩证、个人视角等
+- 金句优先考虑领导人语录（习近平、毛泽东、邓小平等）、古典诗词、名人名言，来源必须真实准确，不确定的不要写
+- 内容要有实质性，不要只给引导问题
 
 题目：${topic.text}`;
 
@@ -1835,13 +1838,13 @@ async function loadScaffold() {
     const items = parseScaffold(text);
     const html = items.length
       ? items.map((item, i) => `
-        <div style="${i > 0 ? 'border-top:1px solid #222;margin-top:12px;padding-top:12px;' : ''}">
+        <div style="${i > 0 ? 'border-top:1px solid #222;margin-top:14px;padding-top:14px;' : ''}">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
             <span class="label">${item.name}</span>
             <button style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;" onclick="saveScaffoldItem(${i})">＋ 存入素材本</button>
           </div>
-          <div style="font-size:14px;line-height:1.7;">${item.content}</div>
-          ${item.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.8;margin-top:6px;">🏷 ${item.usage}</div>` : ''}
+          <div style="font-size:14px;line-height:1.7;color:var(--text);">${item.content}</div>
+          ${item.quotes.length ? `<div style="margin-top:10px;font-size:13px;color:var(--muted);">可用金句：${item.quotes.map(q => `<span style="color:var(--gold);">${q}</span>`).join('；')}</div>` : ''}
         </div>`).join('')
       : `<p>${text.trim().replace(/\n/g, '<br>')}</p>`;
     _scaffoldCache[key] = { html, items };
@@ -1858,18 +1861,20 @@ async function loadScaffold() {
 
 function parseScaffold(text) {
   const items = [];
-  const blocks = text.split(/\[角度[一二三1-3]\]/);
+  const blocks = text.split(/\[思路[一二三1-3]\]/);
   for (const block of blocks) {
     const trimmed = block.trim();
     if (!trimmed) continue;
     const nameMatch = trimmed.match(/^(.{1,10})/);
-    const contentMatch = trimmed.match(/内容[：:]\s*([\s\S]*?)(?=用法[：:]|$)/);
-    const usageMatch = trimmed.match(/用法[：:]\s*(.+)/);
+    const contentMatch = trimmed.match(/内容[：:]\s*([\s\S]*?)(?=金句[：:]|$)/);
+    const quoteMatch = trimmed.match(/金句[：:]\s*([\s\S]*?)$/);
     if (!contentMatch) continue;
+    const quotesRaw = quoteMatch ? quoteMatch[1].trim() : '';
+    const quotes = quotesRaw === '无' ? [] : quotesRaw.split(/[；;]/).map(q => q.trim()).filter(q => q && q !== '无');
     items.push({
-      name: nameMatch ? nameMatch[1].trim().replace(/内容.*/, '').trim() : '角度',
+      name: nameMatch ? nameMatch[1].trim().replace(/内容.*|金句.*/, '').trim() : '思路',
       content: contentMatch[1].trim().replace(/\n/g, ' '),
-      usage: usageMatch ? usageMatch[1].trim() : '',
+      quotes,
     });
   }
   return items;
@@ -1883,7 +1888,8 @@ function saveScaffoldItem(idx) {
   if (!item) return;
   const mats = loadMaterials();
   if (mats.some(m => m.content === item.content)) { alert('已在素材本中'); return; }
-  mats.unshift({ id: Date.now().toString(), content: item.content, tag: '金句观点', usage: item.usage, date: today() });
+  const usage = item.quotes.length ? '金句：' + item.quotes.join('；') : '';
+  mats.unshift({ id: Date.now().toString(), content: item.content, tag: '金句观点', usage, date: today() });
   saveMaterials(mats);
   // 更新按钮状态
   const btns = document.querySelectorAll('#scaffold-out button');
@@ -2971,7 +2977,13 @@ function beginRecording() {
     document.getElementById('timer').textContent = `${Math.floor(sec/60)}:${pad(sec%60)}`;
   }, 500);
 
-  startSR();
+  // 仅浏览器识别模式启用 Web Speech；API 模式只录音，避免干扰
+  if (S.asrType !== 'api') {
+    startSR();
+  } else {
+    document.getElementById('tx-text').textContent = '🎙 录音中（API 模式将在结束后转写）';
+    document.getElementById('tx-text').style.color = 'var(--muted)';
+  }
   startMediaRecorder();
 }
 
@@ -3070,14 +3082,15 @@ async function stopRec() {
       return;
     }
     document.getElementById('eval-status').textContent = '正在识别语音……';
-    document.getElementById('eval-sub').textContent = `调用 ASR 接口转写中（${(audioBlob.size/1024).toFixed(0)} KB）`;
+    document.getElementById('eval-sub').textContent = `调用 ASR 接口转写中（${(audioBlob.size/1024).toFixed(0)} KB，${audioBlob.type}）`;
     show('s-eval');
     try {
       const apiText = await transcribeAudio(audioBlob);
       if (apiText) {
         S.transcript = apiText;
+        console.log('[ASR] success, length=' + apiText.length, 'preview:', apiText.slice(0, 80));
       } else {
-        alert('ASR 接口返回空文本。可能是音频太短、音量过低、或模型不支持当前音频格式（' + audioBlob.type + '）。');
+        alert(`ASR 接口返回空文本。\n音频大小：${(audioBlob.size/1024).toFixed(0)} KB\n音频格式：${audioBlob.type}\n\n可能原因：①音量过低 ②音频太短 ③模型不支持当前格式 ④麦克风没拾到声音`);
         goReady();
         return;
       }
