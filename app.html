@@ -608,6 +608,7 @@ input:focus { outline: none; border-color: var(--gold); }
         <button class="preset-btn" onclick="selectExStyle('opinion',this)">观点鲜明</button>
         <button class="preset-btn" onclick="selectExStyle('speech',this)">演讲风范</button>
         <button class="preset-btn" onclick="selectExStyle('interview',this)">结构化</button>
+        <button class="preset-btn" onclick="selectExStyle('civil',this)">面试</button>
       </div>
       <div id="example-loading" class="example-spin" style="display:none;">
         <div class="spin" style="width:22px;height:22px;border-width:2px;"></div>
@@ -625,11 +626,6 @@ input:focus { outline: none; border-color: var(--gold); }
     <div id="optimize-expanded" style="display:none;margin-top:10px;">
       <div class="example-body" id="optimize-text"></div>
     </div>
-  </div>
-
-  <!-- 短句练习入口 -->
-  <div id="res-phrases-entry" style="display:none;">
-    <button onclick="goPhrasesFromResult()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;">短句训练 → 练习本题相关表达</button>
   </div>
 
   <!-- 高分示范 -->
@@ -3972,9 +3968,6 @@ function showResult(session, evalText) {
     document.getElementById('optimize-section').style.display = 'none';
   }
 
-  // 短句训练入口
-  document.getElementById('res-phrases-entry').style.display = 'block';
-
   // 重置高分示范区
   document.getElementById('highscore-expanded').style.display = 'none';
   document.getElementById('highscore-toggle-btn').textContent = '高分示范 ▶';
@@ -4216,6 +4209,54 @@ async function generateExample() {
 
   loading.style.display = 'flex';
   output.style.display = 'none';
+
+  // 面试模式：使用全新 prompt，只根据题目生成
+  if (_exStyle === 'civil') {
+    const durTarget = S.targetDur === '1-2' ? '约250-350字（1-2分钟）' : S.targetDur === '4-5' ? '约1000-1200字（4-5分钟）' : '约600-750字（2-3分钟）';
+    const civilPrompt = `你是公务员面试教练。请根据以下题目，生成一篇高分面试答案。
+
+判断题型后按对应结构作答，只输出答案内容，不输出判断过程。
+
+【题型与结构】
+
+综合分析题（现象/政策/问题分析类）：
+先挖核心原因（2个左右），语言简洁；再对症提出具体可操作的对策，举例用知名的真实案例，有具体细节；对策和原因要有对应关系，让考官清楚这个方案针对的是哪个问题。
+
+计划组织题（如何策划/组织/安排某项工作）：
+按步骤展开：前期准备→具体实施→跟进落实；每步说清楚做什么、怎么做，不说空话。
+
+人际关系题（处理与同事/领导/群众的关系）：
+先理解各方立场，再说具体沟通思路和处理步骤；态度上尊重、换位思考、以工作大局为重；不和稀泥，要有明确的处理方向。
+
+应急处置题（突发状况如何处理）：
+按轻重缓急：先控制局面保障安全→再处理核心问题→最后复盘总结；每步说清楚具体怎么做。
+
+自我认知题（谈优缺点/动机/职业规划）：
+真实具体有反思，结合合理的经历举例，不说套话。
+
+【通用要求】
+- 开头：各位考官好，考生开始答题
+- 禁止任何 markdown 格式，不加粗，不用加粗子标题
+- 语言像一个人认真思考后说出来的，不像在念文章
+- 首先/其次/最后等过渡词正常使用
+- 举例用知名的真实案例，不编造不确定的近期事件
+- 结尾自然收束，能顺势引到更高层面就自然引出，引不到就简短结束，不强求升华，不生硬套词
+- 字数：${durTarget}
+- 直接输出答案，不加任何说明
+
+【题目】${topic}`;
+    try {
+      const result = await callLLM(civilPrompt, 2000);
+      document.getElementById('example-text').innerHTML = formatExample(result);
+      output.style.display = 'block';
+    } catch(e) {
+      output.innerHTML = '<div class="muted" style="font-size:13px;">生成失败，请重试</div>';
+      output.style.display = 'block';
+    } finally {
+      loading.style.display = 'none';
+    }
+    return;
+  }
 
   const style = EXAMPLE_STYLES[_exStyle];
   const isWord = S.mode === 'word' && S.words?.length;
