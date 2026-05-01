@@ -164,6 +164,8 @@ input:focus { outline: none; border-color: var(--gold); }
 /* ── SETTINGS ── */
 #cfg-enable-optimize:checked + span { background: var(--gold) !important; }
 #cfg-enable-optimize:checked + span::after { transform: translateY(-50%) translateX(18px); }
+#cfg-enable-highscore:checked + span { background: var(--gold) !important; }
+#cfg-enable-highscore:checked + span::after { transform: translateY(-50%) translateX(18px); }
 #optimize-toggle-track::after { content:''; position:absolute; left:4px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
 .type-btn {
   flex: 1; padding: 11px; border-radius: 10px;
@@ -624,6 +626,18 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
+  <!-- 高分示范 -->
+  <div class="example-section" id="highscore-section" style="display:none;">
+    <button onclick="toggleHighScore()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;" id="highscore-toggle-btn">高分示范 ▶</button>
+    <div id="highscore-expanded" style="display:none;margin-top:10px;">
+      <div class="flex gap-6" id="highscore-style-chips" style="flex-wrap:wrap;margin-bottom:12px;">
+        <button class="preset-btn" onclick="selectHighScoreStyle('speech',this)">演讲风</button>
+        <button class="preset-btn" onclick="selectHighScoreStyle('interview',this)">面试风</button>
+      </div>
+      <div class="example-body" id="highscore-text"></div>
+    </div>
+  </div>
+
   <!-- 转写原文 -->
   <div class="example-section" id="res-transcript-section" style="display:none;">
     <button onclick="var d=this.nextElementSibling;var open=d.style.display==='none';d.style.display=open?'block':'none';this.textContent=open?'转写原文 ▲':'转写原文 ▶';" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;">转写原文 ▶</button>
@@ -823,6 +837,16 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
+  <!-- 目标时长 -->
+  <div class="flex col gap-8">
+    <div class="label">目标发言时长</div>
+    <div class="flex gap-6" id="target-dur-chips">
+      <button class="preset-btn" onclick="setTargetDur('1-2',this)">1-2 分钟</button>
+      <button class="preset-btn" onclick="setTargetDur('2-3',this)">2-3 分钟</button>
+      <button class="preset-btn" onclick="setTargetDur('4-5',this)">4-5 分钟</button>
+    </div>
+  </div>
+
   <!-- 优化发言 -->
   <div class="flex" style="align-items:center; justify-content:space-between;">
     <div>
@@ -832,6 +856,18 @@ input:focus { outline: none; border-color: var(--gold); }
     <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
       <input type="checkbox" id="cfg-enable-optimize" style="opacity:0; width:0; height:0;">
       <span style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:13px;transition:.2s;" id="optimize-toggle-track"></span>
+    </label>
+  </div>
+
+  <!-- 85分版本 -->
+  <div class="flex" style="align-items:center; justify-content:space-between;">
+    <div>
+      <div class="label">评分后生成高分示范版本</div>
+      <div class="hint" style="font-size:12px; margin-top:2px;">85分水准，消耗较多 token</div>
+    </div>
+    <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+      <input type="checkbox" id="cfg-enable-highscore" style="opacity:0; width:0; height:0;">
+      <span style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:13px;transition:.2s;" id="highscore-toggle-track"></span>
     </label>
   </div>
 
@@ -1142,7 +1178,9 @@ let S = {
   pauseThresh: parseInt(ls('pause_thresh') || '1000', 10),
   pausePenalty: parseInt(ls('pause_penalty') || '4000', 10),
   prepTime: parseInt(ls('prep_time') || '30', 10),
+  targetDur: ls('target_dur') || '2-3',
   enableOptimize: ls('enable_optimize') !== '0',
+  enableHighScore: ls('enable_highscore') === '1',
   asrType: ls('asr_type') || 'browser',  // 'browser' | 'api'
   asrUrl:  ls('asr_url')  || '',
   asrKey:  ls('asr_key')  || '',
@@ -2381,6 +2419,8 @@ function goSettings() {
   document.getElementById('cfg-asr-key').value = S.asrKey || '';
   document.getElementById('cfg-asr-model').value = S.asrModel || '';
   document.getElementById('cfg-enable-optimize').checked = S.enableOptimize;
+  document.getElementById('cfg-enable-highscore').checked = S.enableHighScore;
+  updateTargetDurChips(S.targetDur);
   show('s-settings');
 }
 
@@ -2479,7 +2519,20 @@ function saveSettings() {
   ls('asr_type', S.asrType); ls('asr_url', asrUrl); ls('asr_key', asrKey); ls('asr_model', asrModel);
   S.enableOptimize = document.getElementById('cfg-enable-optimize').checked;
   ls('enable_optimize', S.enableOptimize ? '1' : '0');
+  S.enableHighScore = document.getElementById('cfg-enable-highscore').checked;
+  ls('enable_highscore', S.enableHighScore ? '1' : '0');
+  ls('target_dur', S.targetDur);
   goHome();
+}
+
+function setTargetDur(val, btn) {
+  S.targetDur = val;
+  updateTargetDurChips(val);
+}
+function updateTargetDurChips(val) {
+  document.querySelectorAll('#target-dur-chips .preset-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.startsWith(val));
+  });
 }
 
 /* ═══════════════════════════════════════
@@ -2969,7 +3022,8 @@ function beginRecording() {
   document.getElementById('tx-text').style.color = 'var(--muted)';
   document.getElementById('no-sr-hint').style.display = 'none';
   renderRecWordChips();
-  document.getElementById('rec-target-hint').textContent = S.mode === 'story' ? '目标 3-5 分钟' : '目标 2-3 分钟';
+  const durLabel = S.mode === 'story' ? '3-5 分钟' : (S.targetDur === '1-2' ? '1-2 分钟' : S.targetDur === '4-5' ? '4-5 分钟' : '2-3 分钟');
+  document.getElementById('rec-target-hint').textContent = `目标 ${durLabel}`;
   show('s-rec');
 
   S.timerRef = setInterval(() => {
@@ -3226,7 +3280,9 @@ async function evaluate() {
   const tm = analyzeTranscript(transcript, duration);
 
   // ── 客观数据段 ──
-  const durationNote = duration < 90 ? '⚠️偏短' : duration > 210 ? '略长' : '✓达标';
+  const [durMin, durMax] = S.targetDur === '1-2' ? [60, 150] : S.targetDur === '4-5' ? [210, 360] : [90, 210];
+  const durTarget = S.targetDur === '1-2' ? '1-2分钟' : S.targetDur === '4-5' ? '4-5分钟' : '2-3分钟';
+  const durationNote = duration < durMin ? '⚠️偏短' : duration > durMax ? '略长' : '✓达标';
   const paceNote = tm.pace < 140 ? '⚠️明显偏慢' : tm.pace > 320 ? '⚠️明显偏快' : tm.pace < 180 ? '略慢' : tm.pace > 290 ? '略快' : '✓正常';
   const fillerDetail = Object.entries(tm.fillerCounts).map(([w,c]) => `「${w}」${c}次`).join('、') || '无';
   const repeatDetail = Object.entries(tm.repeatCounts).map(([w,c]) => `「${w}${w}」${c}次`).join('、') || '无';
@@ -3373,17 +3429,13 @@ ${transcriptLabel}
   }
 
   try {
-    const optimizeInstruction = `\n**优化版本**：[以说话者已表达的观点和思路为核心，在此基础上将表达发挥到最佳水准：有清晰的开头点题、中间有层次的展开、结尾有力收束；去除口头禅和冗余，语言简洁有感染力，逻辑连贯自然；保持口语化。允许围绕说话者已有的观点延伸细节、补充具体例子、加强论证，但不得引入说话者完全未提及的全新论点。字数目标500-700字（对应口播约2-3分钟）。直接输出改写内容，不加任何标题或说明。]`;
-    if (S.enableOptimize) prompt += optimizeInstruction;
     S.debugLastPrompt = prompt;
     S.debugLastResponse = '';
-    const evalText = await callLLM(prompt, S.enableOptimize ? 1500 : 800);
+    const evalText = await callLLM(prompt, 800);
     S.debugLastResponse = evalText;
 
     const scoreM = evalText.match(/\*\*评分\*\*[：:]\s*(\d+)/);
     const score = scoreM ? scoreM[1] : '—';
-    const optimizedM = evalText.match(/\*\*优化版本\*\*[：:]([\s\S]*?)$/);
-    const optimized = optimizedM ? optimizedM[1].trim() : '';
 
     const session = {
       id: S.sessionId,
@@ -3401,7 +3453,8 @@ ${transcriptLabel}
       transcript: S.transcript,
       evaluation: evalText,
       score,
-      optimized,
+      optimized: '',
+      highScore: '',
       metrics: analyzeTranscript(S.transcript, duration),
       audioMetrics: S.audioMetrics,
     };
@@ -3409,9 +3462,96 @@ ${transcriptLabel}
     allSessions.unshift(session);
     S.history = allSessions;
     showResult(session, evalText);
+
+    // 后台并行：优化版本 + 高分示范
+    if (S.enableOptimize) generateOptimized(session);
+    if (S.enableHighScore) generateHighScore(session);
   } catch (err) {
     alert('评估失败：' + err.message + '\n\n请检查 API Key 是否有效，以及网络连接。');
     goHome();
+  }
+}
+
+async function generateOptimized(session) {
+  const actualMins = Math.round(session.duration / 60);
+  const targetChars = Math.max(200, actualMins * 250);
+  const charRange = `${Math.round(targetChars * 0.8)}-${targetChars}字`;
+  const optimizePrompt = `以下是一段口语发言的转写内容，请在保留说话者全部观点和思路的前提下，将表达优化到最佳水准：有清晰的开头点题、中间有层次的展开、结尾有力收束；去除口头禅和冗余，语言简洁有感染力，逻辑连贯自然；保持口语化风格。允许补充具体例子加强论证，但不得引入说话者完全未提及的全新论点。字数目标${charRange}（与原发言时长匹配）。直接输出改写内容，不加任何标题或说明。
+
+【原始发言】
+${session.transcript}`;
+  try {
+    const el = document.getElementById('optimize-text');
+    const section = document.getElementById('optimize-section');
+    if (section) { section.style.display = 'block'; }
+    if (el) el.innerHTML = '<span style="color:var(--muted);font-size:13px;">优化版本生成中…</span>';
+    const text = await callLLM(optimizePrompt, 1200);
+    session.optimized = text;
+    await saveSession(session);
+    const idx = allSessions.findIndex(s => s.id === session.id);
+    if (idx >= 0) allSessions[idx] = session;
+    if (el) el.innerHTML = formatExample(text);
+  } catch(e) {
+    const el = document.getElementById('optimize-text');
+    if (el) el.innerHTML = '<span style="color:var(--muted);font-size:13px;">优化版本生成失败</span>';
+  }
+}
+
+async function generateHighScore(session) {
+  const section = document.getElementById('highscore-section');
+  if (!section) return;
+  section.style.display = 'block';
+  const styleEl = document.getElementById('highscore-style-chips');
+  if (styleEl) styleEl.style.display = 'flex';
+  // 初始提示，等用户选风格后再生成
+  const out = document.getElementById('highscore-text');
+  if (out) out.innerHTML = '';
+}
+
+async function generateHighScoreWithStyle(style) {
+  const session = allSessions[0];
+  if (!session) return;
+  const out = document.getElementById('highscore-text');
+  if (out) out.innerHTML = '<span style="color:var(--muted);font-size:13px;">高分示范生成中…</span>';
+
+  const durTarget = S.targetDur === '1-2' ? '1-2分钟（250-350字）' : S.targetDur === '4-5' ? '4-5分钟（1000-1200字）' : '2-3分钟（500-700字）';
+
+  let stylePrompt;
+  if (style === 'speech') {
+    stylePrompt = `按演讲/口才比赛85分以上标准改写：
+- 开头：引用金句、反问或故事引入，制造吸引力，不直接平铺题目
+- 结构：总-分-总，分论点之间有清晰层次，逻辑递进
+- 语言：有感染力，排比/对仗适度使用，保持口语节奏
+- 引用：自然嵌入1-2句名言或领导人语录
+- 结尾：升华到时代/社会/人生意义层面，留有余韵`;
+  } else {
+    stylePrompt = `按考公结构化面试85分以上标准改写：
+- 开头：一句话直接点明核心立场，不绕弯子
+- 展开：辩证分析，分2-3层递进，每层"论点+论据+落地举措"，论据具体（政策/案例）
+- 引用：自然嵌入1-2句领导人语录
+- 结尾：升华到为民服务/社会发展层面，简短有力
+- 语言：规范口语化，避免空话套话`;
+  }
+
+  const hsPrompt = `以下是说话者的原始发言思路，请以此为基础（保留核心观点方向），按高分标准大幅提升表达质量。允许补强论据、提升站位、加入引用、重构结构。目标时长${durTarget}。直接输出改写内容，不加标题。
+
+${stylePrompt}
+
+【说话者原始思路】
+${session.transcript}
+
+【题目】${session.topic}`;
+
+  try {
+    const text = await callLLM(hsPrompt, 1800);
+    session.highScore = session.highScore || {};
+    session.highScore[style] = text;
+    await saveSession(session);
+    const idx = allSessions.findIndex(s => s.id === session.id);
+    if (idx >= 0) allSessions[idx] = session;
+    if (out) out.innerHTML = formatExample(text);
+  } catch(e) {
+    if (out) out.innerHTML = '<span style="color:var(--muted);font-size:13px;">生成失败，请重试</span>';
   }
 }
 
@@ -3563,6 +3703,20 @@ function showResult(session, evalText) {
     document.getElementById('optimize-section').style.display = 'block';
   } else {
     document.getElementById('optimize-section').style.display = 'none';
+  }
+
+  // 重置高分示范区
+  document.getElementById('highscore-expanded').style.display = 'none';
+  document.getElementById('highscore-toggle-btn').textContent = '高分示范 ▶';
+  document.getElementById('highscore-text').innerHTML = '';
+  document.querySelectorAll('#highscore-style-chips .preset-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('highscore-section').style.display = session.highScore ? 'block' : 'none';
+  if (session.highScore) {
+    const style = Object.keys(session.highScore)[0];
+    if (style) {
+      document.getElementById('highscore-text').innerHTML = formatExample(session.highScore[style]);
+      document.querySelector(`#highscore-style-chips .preset-btn[onclick*="${style}"]`)?.classList.add('active');
+    }
   }
 
   show('s-result');
@@ -3761,11 +3915,12 @@ const EXAMPLE_STYLES = {
   },
   interview: {
     label: '考公面试',
-    desc: `按结构化面试标准作答：开头一句话直接亮明立场或点明作答角度，不绕弯子；
-展开部分分2-3个要点，每点格式为"要点名称+简要解释+具体举措或案例"；
-语言规范有层次，有"高度"但接地气，避免空话套话；
-结尾简短总结，可适当升华到为民服务、推动社会发展等层面；
-整体口语化，适合当场说出来，约200字。`,
+    desc: `按考公结构化面试85分以上标准作答：
+开头：一句话点明核心立场或破题角度，不绕弯子，不重复题目；
+展开：辩证分析（一分为二，承认复杂性），分2-3个层次递进，每层有"论点+论据+落地举措"，论据要具体（政策/案例/数据），举措要可操作；
+引用：自然嵌入1-2句领导人语录或古典名句，不生硬堆砌；
+结尾：简短有力，升华到为民服务/社会发展/时代责任层面，留有余韵；
+语言：规范有层次，口语化，避免空话套话，每句话都在推进论点。`,
   },
 };
 
@@ -3795,21 +3950,23 @@ async function generateExample() {
   const style = EXAMPLE_STYLES[_exStyle];
   const isWord = S.mode === 'word' && S.words?.length;
   const wordLine = isWord ? `\n【必须串联的词语】${S.words.join('、')}（每个词语必须自然出现在示范中）` : '';
-  const prompt = `你是口语表达教练。请为以下话题写一段口语示范稿（约200字），供练习者参考学习。
-
+  const isInterview = _exStyle === 'interview';
+  const wordCount = isInterview ? '500-600字' : '330-380字';
+  const tokenLimit = isInterview ? 1800 : 1200;
+  const structureNote = isInterview ? '' : '\n【结构要求】\n分三段，开头、展开、收尾各一段，段落之间空一行，不要加任何标签或编号。\n';
+  const subtypeNote = isInterview && S.topic?.subtype ? `\n【题型】${S.topic.subtype}` : '';
+  const prompt = `你是口语表达教练。请为以下话题写一段口语示范稿，供练习者参考学习。
+${structureNote}
 【风格要求】
 ${style.desc}
 
-【结构要求】
-分三段，开头、展开、收尾各一段，段落之间空一行，不要加任何标签或编号。
-
 【话题】${topic}
-【主题】${theme}${wordLine}
+【主题】${theme}${subtypeNote}${wordLine}
 
-注意：写的是口头表达，不是书面文章；字数必须在330-380字之间，不得明显偏少。`;
+注意：写的是口头表达，不是书面文章；字数必须在${wordCount}之间，不得明显偏少。`;
 
   try {
-    const result = await callLLM(prompt, 1200);
+    const result = await callLLM(prompt, tokenLimit);
     document.getElementById('example-text').innerHTML = formatExample(result);
     output.style.display = 'block';
   } catch(e) {
@@ -3818,6 +3975,20 @@ ${style.desc}
   } finally {
     loading.style.display = 'none';
   }
+}
+
+function toggleHighScore() {
+  const expanded = document.getElementById('highscore-expanded');
+  const btn = document.getElementById('highscore-toggle-btn');
+  const open = expanded.style.display === 'none';
+  expanded.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '高分示范 ▲' : '高分示范 ▶';
+}
+
+function selectHighScoreStyle(style, btn) {
+  document.querySelectorAll('#highscore-style-chips .preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  generateHighScoreWithStyle(style);
 }
 
 function toggleOptimize() {
