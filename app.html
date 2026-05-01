@@ -168,6 +168,8 @@ input:focus { outline: none; border-color: var(--gold); }
 #cfg-enable-highscore:checked + span::after { transform: translateY(-50%) translateX(18px); }
 #cfg-interview-twostage:checked + span { background: var(--gold) !important; }
 #cfg-interview-twostage:checked + span::after { transform: translateY(-50%) translateX(18px); }
+#cfg-enable-think-model:checked + span { background: var(--gold) !important; }
+#cfg-enable-think-model:checked + span::after { transform: translateY(-50%) translateX(18px); }
 #optimize-toggle-track::after { content:''; position:absolute; left:4px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
 .type-btn {
   flex: 1; padding: 11px; border-radius: 10px;
@@ -754,6 +756,22 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="hint" id="model-hint" style="font-size:12px; line-height:1.6;"></div>
   </div>
 
+  <!-- 思考模型 -->
+  <div class="flex col gap-8">
+    <div class="flex" style="align-items:center; justify-content:space-between;">
+      <div>
+        <div class="label">思考模型</div>
+        <div class="hint" style="font-size:12px; margin-top:2px;">开启后用于面试示范生成，关闭则使用主模型</div>
+      </div>
+      <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+        <input type="checkbox" id="cfg-enable-think-model" style="opacity:0; width:0; height:0;">
+        <span style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:13px;transition:.2s;" id="think-model-toggle-track"></span>
+      </label>
+    </div>
+    <input type="text" id="cfg-think-model" placeholder="如 deepseek-v3" autocomplete="off"
+      style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:10px 12px;outline:none;width:100%;box-sizing:border-box;"/>
+  </div>
+
   <!-- ASR 语音识别 -->
   <div class="flex col gap-8">
     <div class="label">语音识别方式</div>
@@ -847,6 +865,7 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="flex gap-6" id="target-dur-chips">
       <button class="preset-btn" onclick="setTargetDur('1-2',this)">1-2 分钟</button>
       <button class="preset-btn" onclick="setTargetDur('2-3',this)">2-3 分钟</button>
+      <button class="preset-btn" onclick="setTargetDur('3-4',this)">3-4 分钟</button>
       <button class="preset-btn" onclick="setTargetDur('4-5',this)">4-5 分钟</button>
     </div>
   </div>
@@ -874,6 +893,7 @@ input:focus { outline: none; border-color: var(--gold); }
       <span style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:13px;transition:.2s;" id="highscore-toggle-track"></span>
     </label>
   </div>
+
 
   <!-- 面试生成模式 -->
   <div class="flex" style="align-items:center; justify-content:space-between;">
@@ -1250,6 +1270,8 @@ let S = {
   enableOptimize: ls('enable_optimize') !== '0',
   enableHighScore: ls('enable_highscore') === '1',
   interviewTwoStage: ls('interview_twostage') === '1',
+  enableThinkModel: ls('enable_think_model') === '1',
+  thinkModel: ls('think_model') || '',
   asrType: ls('asr_type') || 'browser',  // 'browser' | 'api'
   asrUrl:  ls('asr_url')  || '',
   asrKey:  ls('asr_key')  || '',
@@ -2661,7 +2683,7 @@ function hideDeploy() { document.getElementById('deploy-notice').classList.remov
 ═══════════════════════════════════════ */
 const PRESETS = {
   moonshot:   { url: 'https://api.moonshot.cn',      model: 'moonshot-v1-8k' },
-  deepseek:   { url: 'https://api.deepseek.com',     model: 'deepseek-chat' },
+  deepseek:   { url: 'https://api.deepseek.com',     model: 'deepseek-v4-flash', thinkModel: 'deepseek-v4-pro' },
   openrouter: { url: 'https://openrouter.ai/api',    model: 'openai/gpt-4o-mini' },
   openai:     { url: 'https://api.openai.com',       model: 'gpt-4o-mini' },
 };
@@ -2695,6 +2717,8 @@ function goSettings() {
   document.getElementById('cfg-enable-optimize').checked = S.enableOptimize;
   document.getElementById('cfg-enable-highscore').checked = S.enableHighScore;
   document.getElementById('cfg-interview-twostage').checked = S.interviewTwoStage;
+  document.getElementById('cfg-enable-think-model').checked = S.enableThinkModel;
+  document.getElementById('cfg-think-model').value = S.thinkModel;
   updateTargetDurChips(S.targetDur);
   show('s-settings');
 }
@@ -2760,8 +2784,10 @@ function fillPreset(name) {
   if (!p) return;
   document.getElementById('cfg-url').value = p.url;
   document.getElementById('cfg-model').value = p.model;
-  // 更新 hint
   document.getElementById('model-hint').textContent = MODEL_HINTS[name] || '';
+  if (p.thinkModel) {
+    document.getElementById('cfg-think-model').value = p.thinkModel;
+  }
 }
 
 function saveSettings() {
@@ -2798,6 +2824,10 @@ function saveSettings() {
   ls('enable_highscore', S.enableHighScore ? '1' : '0');
   S.interviewTwoStage = document.getElementById('cfg-interview-twostage').checked;
   ls('interview_twostage', S.interviewTwoStage ? '1' : '0');
+  S.enableThinkModel = document.getElementById('cfg-enable-think-model').checked;
+  S.thinkModel = document.getElementById('cfg-think-model').value.trim();
+  ls('enable_think_model', S.enableThinkModel ? '1' : '0');
+  ls('think_model', S.thinkModel);
   ls('target_dur', S.targetDur);
   goHome();
 }
@@ -2815,10 +2845,11 @@ function updateTargetDurChips(val) {
 /* ═══════════════════════════════════════
    LLM CALL
 ═══════════════════════════════════════ */
-async function callLLM(prompt, maxTokens = 800) {
+async function callLLM(prompt, maxTokens = 800, useThinkModel = false) {
   const type = S.apiType || 'anthropic';
   const key = S.apiKey;
-  const model = S.apiModel || (type === 'anthropic' ? 'claude-haiku-4-5' : '');
+  const baseModel = S.apiModel || (type === 'anthropic' ? 'claude-haiku-4-5' : '');
+  const model = (useThinkModel && S.enableThinkModel && S.thinkModel) ? S.thinkModel : baseModel;
   const baseUrl = (S.apiUrl || '').replace(/\/$/, '');
 
   if (type === 'openai') {
@@ -3299,7 +3330,7 @@ function beginRecording() {
   document.getElementById('tx-text').style.color = 'var(--muted)';
   document.getElementById('no-sr-hint').style.display = 'none';
   renderRecWordChips();
-  const durLabel = S.mode === 'story' ? '3-5 分钟' : (S.targetDur === '1-2' ? '1-2 分钟' : S.targetDur === '4-5' ? '4-5 分钟' : '2-3 分钟');
+  const durLabel = S.mode === 'story' ? '3-5 分钟' : (S.targetDur === '1-2' ? '1-2 分钟' : S.targetDur === '3-4' ? '3-4 分钟' : S.targetDur === '4-5' ? '4-5 分钟' : '2-3 分钟');
   document.getElementById('rec-target-hint').textContent = `目标 ${durLabel}`;
   show('s-rec');
 
@@ -3557,8 +3588,8 @@ async function evaluate() {
   const tm = analyzeTranscript(transcript, duration);
 
   // ── 客观数据段 ──
-  const [durMin, durMax] = S.targetDur === '1-2' ? [60, 150] : S.targetDur === '4-5' ? [210, 360] : [90, 210];
-  const durTarget = S.targetDur === '1-2' ? '1-2分钟' : S.targetDur === '4-5' ? '4-5分钟' : '2-3分钟';
+  const [durMin, durMax] = S.targetDur === '1-2' ? [60, 150] : S.targetDur === '3-4' ? [150, 270] : S.targetDur === '4-5' ? [210, 360] : [90, 210];
+  const durTarget = S.targetDur === '1-2' ? '1-2分钟' : S.targetDur === '3-4' ? '3-4分钟' : S.targetDur === '4-5' ? '4-5分钟' : '2-3分钟';
   const durationNote = duration < durMin ? '⚠️偏短' : duration > durMax ? '略长' : '✓达标';
   const paceNote = tm.pace < 140 ? '⚠️明显偏慢' : tm.pace > 320 ? '⚠️明显偏快' : tm.pace < 180 ? '略慢' : tm.pace > 290 ? '略快' : '✓正常';
   const fillerDetail = Object.entries(tm.fillerCounts).map(([w,c]) => `「${w}」${c}次`).join('、') || '无';
@@ -3791,7 +3822,7 @@ async function generateHighScoreWithStyle(style) {
   const out = document.getElementById('highscore-text');
   if (out) out.innerHTML = '<span style="color:var(--muted);font-size:13px;">高分示范生成中…</span>';
 
-  const durTarget = S.targetDur === '1-2' ? '1-2分钟（250-350字）' : S.targetDur === '4-5' ? '4-5分钟（1000-1200字）' : '2-3分钟（500-700字）';
+  const durTarget = S.targetDur === '1-2' ? '1-2分钟（250-350字）' : S.targetDur === '3-4' ? '3-4分钟（600-680字）' : S.targetDur === '4-5' ? '4-5分钟（750-850字）' : '2-3分钟（450-550字）';
 
   let stylePrompt;
   if (style === 'speech') {
@@ -3849,7 +3880,7 @@ ${session.transcript}
 【题目】${session.topic}`;
 
   try {
-    const text = await callLLM(hsPrompt, 1800);
+    const text = await callLLM(hsPrompt, 1800, style === 'interview');
     session.highScore = session.highScore || {};
     session.highScore[style] = text;
     await saveSession(session);
@@ -4255,7 +4286,7 @@ async function generateExample() {
 
   // 面试模式：使用全新 prompt，只根据题目生成
   if (_exStyle === 'civil') {
-    const durTarget = S.targetDur === '1-2' ? '约250-350字（1-2分钟）' : S.targetDur === '4-5' ? '约1000-1200字（4-5分钟）' : '约600-750字（2-3分钟）';
+    const durTarget = S.targetDur === '1-2' ? '约250-350字（1-2分钟）' : S.targetDur === '3-4' ? '约600-680字（3-4分钟）' : S.targetDur === '4-5' ? '约750-850字（4-5分钟）' : '约450-550字（2-3分钟）';
     const civilPrompt = `请根据以下面试题目，模拟真实考生在面试现场口头作答。
 
 请严格模仿以下示例的语言风格、句子长度和对策结构，不要比示例更复杂：
@@ -4308,9 +4339,9 @@ async function generateExample() {
 
 【骨架】
 ${skeleton}`;
-        result = await callLLM(expandPrompt, 2000);
+        result = await callLLM(expandPrompt, 2000, true);
       } else {
-        result = await callLLM(civilPrompt, 2000);
+        result = await callLLM(civilPrompt, 2000, true);
       }
       document.getElementById('example-text').innerHTML = formatExample(result);
       output.style.display = 'block';
