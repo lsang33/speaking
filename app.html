@@ -620,6 +620,10 @@ input:focus { outline: none; border-color: var(--gold); }
       </div>
       <div id="example-output" style="display:none;">
         <div class="example-body" id="example-text"></div>
+        <button onclick="saveExampleToMaterials()" id="example-save-btn"
+          style="margin-top:12px;background:none;border:1px solid #444;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 14px;width:100%;">
+          存入素材本
+        </button>
       </div>
     </div>
   </div>
@@ -3835,13 +3839,14 @@ async function generateHighScoreWithStyle(style) {
 - 每句话不超过30字，确保一口气能说完，不堆砌长从句
 - 避免过于书面的词汇（如同频共振、社会镜像等）`;
   } else {
-    stylePrompt = `以考生已有思路为基础，提升到面试高分水准。这是口头表达，说出来要自然直接，不是写文章。
+    stylePrompt = `以考生已有思路为基础，提升到面试高分水准。这是口头表达，语言要自然直接，不像在念文章。
 
 严格禁止：
-- 用引号给每段命名，如"内容上要做'翻译'"、"形式上要'破圈'"
 - 创造抽象概念词，如"围墙思维"、"二元对立"、"同频共振"
-- 开头"我将从X个维度来分析"
+- 用引号给段落命名，如"内容上要做'翻译'"、"形式上'破圈'"
+- 开头说"我将从X个维度来分析"
 - 结尾强行拔高"唯有如此，方能实现..."
+- 用考试比喻收尾（如"这是一道必答题"）
 - 长句堆叠，一句话塞多个从句
 
 判断题型后按对应结构重组，只输出答案内容：
@@ -4261,6 +4266,19 @@ const EXAMPLE_STYLES = {
   },
 };
 
+function saveExampleToMaterials() {
+  const text = document.getElementById('example-text')?.innerText?.trim();
+  if (!text) return;
+  const topic = S.topic?.text || '';
+  const styleLabel = EXAMPLE_STYLES[_exStyle]?.label || (_exStyle === 'civil' ? '面试' : '示范');
+  const mats = loadMaterials();
+  if (mats.some(m => m.content === text)) { alert('已在素材本中'); return; }
+  mats.unshift({ id: Date.now().toString(), content: text, tag: '示范参考', usage: topic ? `${topic} · ${styleLabel}` : styleLabel, date: today() });
+  saveMaterials(mats);
+  const btn = document.getElementById('example-save-btn');
+  if (btn) { btn.textContent = '已存入 ✓'; btn.disabled = true; btn.style.color = 'var(--gold)'; btn.style.borderColor = 'var(--gold)'; }
+}
+
 function openExample() {
   document.getElementById('example-expanded').style.display = 'block';
   document.getElementById('example-btn').style.display = 'none';
@@ -4283,11 +4301,16 @@ async function generateExample() {
 
   loading.style.display = 'flex';
   output.style.display = 'none';
+  const saveBtn = document.getElementById('example-save-btn');
+  if (saveBtn) { saveBtn.textContent = '存入素材本'; saveBtn.disabled = false; saveBtn.style.color = 'var(--muted)'; saveBtn.style.borderColor = '#444'; }
 
   // 面试模式：使用全新 prompt，只根据题目生成
   if (_exStyle === 'civil') {
     const durTarget = S.targetDur === '1-2' ? '约250-350字（1-2分钟）' : S.targetDur === '3-4' ? '约600-680字（3-4分钟）' : S.targetDur === '4-5' ? '约750-850字（4-5分钟）' : '约450-550字（2-3分钟）';
     const civilPrompt = `请根据以下面试题目，模拟真实考生在面试现场口头作答。
+
+这是口头表达，语言要自然直接，不像在念文章。
+禁止：创造抽象概念词（如围墙思维、同频共振、二元对立）；用引号给段落命名（如内容上要做"翻译"、形式上"破圈"）；开头说"我将从X个维度来分析"；长句堆叠；用考试比喻收尾（如"这是一道必答题"、"这是一道必须答好的题"）。
 
 请严格模仿以下示例的语言风格、句子长度和对策结构，不要比示例更复杂：
 
@@ -4302,7 +4325,7 @@ async function generateExample() {
 应急处置题：按轻重缓急，控制局面→处理问题→事后复盘，每步具体。
 自我认知题：真实具体，结合经历举例，不说套话。
 
-格式：开头"各位考官好，考生开始答题"；不加粗不用标题；字数：${durTarget}
+格式：开头"各位考官好，考生开始答题"；不加粗不用标题；原因段、每条对策、结尾各为独立段落，段落之间空一行；字数：${durTarget}
 禁止：捏造第一人称亲身经历（"我有一个亲身经历"、"我曾经"等）；结尾禁止引号对仗句（"从'A'变成'B'"这类）
 
 【题目】${topic}`;
@@ -4407,13 +4430,17 @@ function toggleOptimize() {
 }
 
 function formatExample(text) {
-  // 去掉结构标签，按段落拆分渲染
-  return text
-    .replace(/【(开头|展开|收尾)】\s*/g, '')
-    .split(/\n{2,}|\n(?=\S)/)
-    .map(p => p.trim())
+  // 去掉结构标签
+  let t = text.replace(/【(开头|展开|收尾)】\s*/g, '');
+  // 如果没有双换行，在面试过渡词前自动插入换行
+  if (!t.includes('\n\n')) {
+    t = t.replace(/(为此[，,]|首先[是要]|其次[是要]|最后[，,]|总之[，,]|综上所述[，,])/g, '\n\n$1');
+  }
+  return t
+    .split(/\n{2,}/)
+    .map(p => p.trim().replace(/\n/g, '<br>'))
     .filter(Boolean)
-    .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+    .map(p => `<p>${p}</p>`)
     .join('');
 }
 
