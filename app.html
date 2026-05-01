@@ -387,6 +387,7 @@ input:focus { outline: none; border-color: var(--gold); }
       <button class="btn btn-ghost" onclick="goHistory()" style="flex:1;">历史</button>
       <button class="btn btn-ghost" onclick="goTopics()" style="flex:1;">题库</button>
       <button class="btn btn-ghost" onclick="goMaterials()" style="flex:1;">素材本</button>
+      <button class="btn btn-ghost" onclick="goPhrases()" style="flex:1;">短句练</button>
     </div>
     <div class="flex gap-8">
       <button class="btn btn-ghost" onclick="goWordReady()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">词语串联</button>
@@ -624,6 +625,11 @@ input:focus { outline: none; border-color: var(--gold); }
     <div id="optimize-expanded" style="display:none;margin-top:10px;">
       <div class="example-body" id="optimize-text"></div>
     </div>
+  </div>
+
+  <!-- 短句练习入口 -->
+  <div id="res-phrases-entry" style="display:none;">
+    <button onclick="goPhrasesFromResult()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;">短句训练 → 练习本题相关表达</button>
   </div>
 
   <!-- 高分示范 -->
@@ -898,6 +904,57 @@ input:focus { outline: none; border-color: var(--gold); }
 </div>
 
 <!-- ═══ TOPICS BANK ═══ -->
+<!-- ═══ PHRASES ═══ -->
+<div id="s-phrases" class="screen flex col gap-14">
+  <div class="flex" style="align-items:center;gap:10px;">
+    <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
+    <span style="font-weight:600;font-size:16px;">短句训练</span>
+  </div>
+
+  <!-- 搜索 -->
+  <div style="position:relative;">
+    <input id="phrase-search" type="search" placeholder="搜索短句…" oninput="setPhraseSearch(this.value)"
+      style="width:100%;background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:9px 34px 9px 36px;box-sizing:border-box;outline:none;-webkit-appearance:none;">
+    <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none;">🔍</span>
+    <button onclick="clearPhraseSearch()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:2px 4px;line-height:1;">×</button>
+  </div>
+
+  <!-- 新增表单 -->
+  <div id="phrase-add-box" style="display:none;background:var(--card);border-radius:12px;padding:14px;flex-direction:column;gap:10px;">
+    <div style="font-weight:600;font-size:14px;" id="phrase-add-title">新增短句</div>
+    <input type="hidden" id="phrase-edit-id">
+    <textarea id="phrase-add-text" rows="3" placeholder="输入短句内容…"
+      style="background:var(--card2);border:1.5px solid #333;border-radius:10px;color:var(--text);font-size:14px;padding:10px 12px;resize:none;outline:none;width:100%;box-sizing:border-box;"
+      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+    <div style="font-size:12px;color:var(--muted);">场景分类</div>
+    <div class="flex gap-6" id="phrase-add-cat-chips" style="flex-wrap:wrap;"></div>
+    <input type="hidden" id="phrase-add-cat" value="自定义">
+    <div class="flex gap-8">
+      <button class="btn btn-ghost" onclick="hidePhraseAdd()" style="flex:1;">取消</button>
+      <button class="btn btn-gold" onclick="savePhrase()" style="flex:2;">保存</button>
+    </div>
+  </div>
+
+  <!-- 操作栏 -->
+  <div class="flex gap-8" style="align-items:center;">
+    <button class="btn btn-ghost" onclick="showPhraseAdd()" style="flex:1;font-size:13px;">＋ 新增</button>
+    <button class="preset-btn active" id="phrase-filter-all" onclick="setPhraseFilter('all',this)" style="flex:1;">全部</button>
+    <button class="preset-btn" id="phrase-filter-todo" onclick="setPhraseFilter('todo',this)" style="flex:1;">未掌握</button>
+    <button class="preset-btn" id="phrase-filter-mine" onclick="setPhraseFilter('mine',this)" style="flex:1;">我的</button>
+  </div>
+
+  <!-- 类别筛选 -->
+  <div class="flex gap-6" id="phrase-cat-chips" style="flex-wrap:wrap;"></div>
+
+  <div id="phrase-ai-wrap" style="display:none;">
+    <button class="btn btn-ghost" id="phrase-ai-btn" onclick="generateAIPhrases()" style="width:100%;font-size:13px;">✨ AI 生成本题短句</button>
+  </div>
+
+  <div id="phrase-list" class="flex col gap-8"></div>
+</div>
+
+<!-- 短句练习遮罩 -->
+
 <!-- ═══ MATERIALS ═══ -->
 <div id="s-materials" class="screen flex col gap-14">
   <div style="display:flex; align-items:center; gap:8px;">
@@ -1024,6 +1081,7 @@ input:focus { outline: none; border-color: var(--gold); }
 <script src="topics.js"></script>
 <script src="words.js"></script>
 <script src="materials.js"></script>
+<script src="phrases.js"></script>
 <script>
 /* ═══════════════════════════════════════
    APP
@@ -1260,6 +1318,211 @@ function saveMaterials(arr) { ls('materials', JSON.stringify(arr)); }
 
 let matFilter = 'all';
 let matSearch = '';
+
+/* ═══════════════════════════════════════
+   SHORT PHRASES
+═══════════════════════════════════════ */
+let _phraseFilter = 'all';
+let _phraseCat = '全部';
+let _phraseSearch = '';
+let _aiPhrases = [];
+let _phraseFromTopic = null;
+
+function loadMasteredPhrases() {
+  try { return new Set(JSON.parse(ls('mastered_phrases') || '[]')); } catch(e) { return new Set(); }
+}
+function saveMasteredPhrases(set) { ls('mastered_phrases', JSON.stringify([...set])); }
+function loadUserPhrases() {
+  try { return JSON.parse(ls('user_phrases') || '[]'); } catch(e) { return []; }
+}
+function saveUserPhrases(arr) { ls('user_phrases', JSON.stringify(arr)); }
+
+function goPhrases(topic) {
+  _phraseFromTopic = topic || null;
+  _phraseCat = '全部';
+  _phraseFilter = 'all';
+  _phraseSearch = '';
+  _aiPhrases = [];
+  document.getElementById('phrase-search').value = '';
+  document.getElementById('phrase-ai-wrap').style.display = _phraseFromTopic ? 'block' : 'none';
+  document.getElementById('phrase-ai-btn').textContent = '✨ AI 生成本题短句';
+  document.getElementById('phrase-ai-btn').disabled = false;
+  hidePhraseAdd();
+  renderPhraseCategories();
+  renderPhraseList();
+  show('s-phrases');
+}
+
+function setPhraseSearch(val) { _phraseSearch = val; renderPhraseList(); }
+function clearPhraseSearch() { _phraseSearch = ''; document.getElementById('phrase-search').value = ''; renderPhraseList(); }
+
+function showPhraseAdd() {
+  document.getElementById('phrase-add-box').style.display = 'flex';
+  document.getElementById('phrase-add-title').textContent = '新增短句';
+  document.getElementById('phrase-edit-id').value = '';
+  document.getElementById('phrase-add-text').value = '';
+  document.getElementById('phrase-add-cat').value = '自定义';
+  renderPhraseAddCatChips('自定义');
+  document.getElementById('phrase-add-box').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function hidePhraseAdd() { document.getElementById('phrase-add-box').style.display = 'none'; }
+
+function renderPhraseAddCatChips(selected) {
+  const cats = ['自定义', ...Object.keys(PHRASE_BANK)];
+  document.getElementById('phrase-add-cat-chips').innerHTML = cats.map(c =>
+    `<button type="button" class="preset-btn${c === selected ? ' active' : ''}" onclick="selectPhraseAddCat('${c}',this)">${c}</button>`
+  ).join('');
+}
+
+function selectPhraseAddCat(cat, btn) {
+  document.getElementById('phrase-add-cat').value = cat;
+  document.querySelectorAll('#phrase-add-cat-chips .preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function savePhrase() {
+  const text = document.getElementById('phrase-add-text').value.trim();
+  if (!text) { document.getElementById('phrase-add-text').style.borderColor = 'var(--red)'; return; }
+  document.getElementById('phrase-add-text').style.borderColor = '#333';
+  const cat = document.getElementById('phrase-add-cat').value || '自定义';
+  const editId = document.getElementById('phrase-edit-id').value;
+  const phrases = loadUserPhrases();
+  if (editId) {
+    const idx = phrases.findIndex(p => p.id === editId);
+    if (idx >= 0) phrases[idx] = { ...phrases[idx], text, cat };
+  } else {
+    phrases.unshift({ id: Date.now().toString(), text, cat, date: today() });
+  }
+  saveUserPhrases(phrases);
+  hidePhraseAdd();
+  renderPhraseList();
+}
+
+function editPhrase(id) {
+  const p = loadUserPhrases().find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('phrase-add-box').style.display = 'flex';
+  document.getElementById('phrase-add-title').textContent = '编辑短句';
+  document.getElementById('phrase-edit-id').value = id;
+  const ta = document.getElementById('phrase-add-text');
+  ta.value = p.text;
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+  document.getElementById('phrase-add-cat').value = p.cat || '自定义';
+  renderPhraseAddCatChips(p.cat || '自定义');
+  document.getElementById('phrase-add-box').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function deletePhrase(id) {
+  if (!confirm('删除这条短句？')) return;
+  saveUserPhrases(loadUserPhrases().filter(p => p.id !== id));
+  renderPhraseList();
+}
+
+function goPhrasesFromResult() {
+  const session = allSessions[0];
+  goPhrases(session ? session.topic : null);
+}
+
+function renderPhraseCategories() {
+  const cats = ['全部', ...Object.keys(PHRASE_BANK)];
+  document.getElementById('phrase-cat-chips').innerHTML = cats.map(c =>
+    `<button class="preset-btn${c === _phraseCat ? ' active' : ''}" onclick="setPhraseCat('${c}',this)">${c}</button>`
+  ).join('');
+}
+
+function setPhraseCat(cat) {
+  _phraseCat = cat;
+  renderPhraseCategories();
+  renderPhraseList();
+}
+
+function setPhraseFilter(f, btn) {
+  if (_phraseFilter === f && f !== 'all') { f = 'all'; }
+  _phraseFilter = f;
+  document.querySelectorAll('#phrase-filter-all,#phrase-filter-todo,#phrase-filter-mine').forEach(b => b.classList.remove('active'));
+  document.getElementById('phrase-filter-' + f).classList.add('active');
+  renderPhraseList();
+}
+
+let _renderedPhrases = [];
+
+function renderPhraseList() {
+  const mastered = loadMasteredPhrases();
+  const userPhrases = loadUserPhrases();
+  const kw = _phraseSearch.trim().toLowerCase();
+
+  let all = [];
+  userPhrases.forEach(p => all.push({ id: p.id, text: p.text, cat: p.cat || '自定义', isUser: true }));
+  if (_aiPhrases.length) _aiPhrases.forEach(p => all.push({ text: p, cat: 'AI 生成', isUser: false }));
+  if (_phraseCat === '全部') {
+    Object.entries(PHRASE_BANK).forEach(([cat, list]) => list.forEach(p => all.push({ text: p, cat, isUser: false })));
+  } else if (PHRASE_BANK[_phraseCat]) {
+    PHRASE_BANK[_phraseCat].forEach(p => all.push({ text: p, cat: _phraseCat, isUser: false }));
+  }
+
+  if (_phraseCat !== '全部') all = all.filter(p => p.cat === _phraseCat);
+  if (_phraseFilter === 'todo') all = all.filter(p => !mastered.has(p.text));
+  if (_phraseFilter === 'mine') all = all.filter(p => p.isUser || p.cat === 'AI 生成');
+  if (kw) all = all.filter(p => p.text.toLowerCase().includes(kw) || p.cat.toLowerCase().includes(kw));
+
+  all.sort((a, b) => (mastered.has(a.text) ? 1 : 0) - (mastered.has(b.text) ? 1 : 0));
+  _renderedPhrases = all;
+
+  const el = document.getElementById('phrase-list');
+  if (!all.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">暂无短句</div>';
+    return;
+  }
+  el.innerHTML = all.map((p, i) => `
+    <div style="background:var(--card);border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;">
+      <div style="flex:1;">
+        <div style="font-size:14px;line-height:1.6;${mastered.has(p.text) ? 'color:var(--muted);text-decoration:line-through;' : ''}">${p.text}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;gap:8px;align-items:center;">
+          <span>${p.cat}</span>
+          ${p.isUser ? `<button onclick="editPhrase('${p.id}')" style="background:none;border:none;color:var(--gold);font-size:11px;cursor:pointer;padding:0;">编辑</button><button onclick="deletePhrase('${p.id}')" style="background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;padding:0;">删除</button>` : ''}
+        </div>
+      </div>
+      <button onclick="togglePhrasemastered(${i})" style="background:none;border:1px solid ${mastered.has(p.text) ? 'var(--gold)' : '#444'};color:${mastered.has(p.text) ? 'var(--gold)' : 'var(--muted)'};border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">${mastered.has(p.text) ? '已掌握 ✓' : '掌握'}</button>
+    </div>`).join('');
+}
+
+
+function togglePhrasemastered(i) {
+  const p = _renderedPhrases[i];
+  if (!p) return;
+  const mastered = loadMasteredPhrases();
+  if (mastered.has(p.text)) { mastered.delete(p.text); } else { mastered.add(p.text); }
+  saveMasteredPhrases(mastered);
+  renderPhraseList();
+}
+
+async function generateAIPhrases() {
+  if (!_phraseFromTopic) return;
+  const btn = document.getElementById('phrase-ai-btn');
+  btn.textContent = '生成中…';
+  btn.disabled = true;
+  const prompt = `你是公务员面试教练。请为以下面试题目提供10个适合口头表达的"正式口语"短句，用于考生练习。
+
+要求：
+- 每句15-25字，说出来自然流畅，不生硬
+- 介于口语和书面之间，适合面试场合
+- 直接与题目相关，练完能用到答题中
+- 每句单独一行，不加编号或其他内容
+
+题目：${_phraseFromTopic}`;
+  try {
+    const text = await callLLM(prompt, 600);
+    _aiPhrases = text.split('\n').map(s => s.trim()).filter(s => s.length > 5 && s.length < 50);
+    btn.textContent = `✨ 已生成 ${_aiPhrases.length} 句（重新生成）`;
+    btn.disabled = false;
+    setPhraseCat('全部');
+  } catch(e) {
+    btn.textContent = '生成失败，重试';
+    btn.disabled = false;
+  }
+}
 
 function goMaterials() {
   matFilter = 'all';
@@ -3709,6 +3972,9 @@ function showResult(session, evalText) {
     document.getElementById('optimize-section').style.display = 'none';
   }
 
+  // 短句训练入口
+  document.getElementById('res-phrases-entry').style.display = 'block';
+
   // 重置高分示范区
   document.getElementById('highscore-expanded').style.display = 'none';
   document.getElementById('highscore-toggle-btn').textContent = '高分示范 ▶';
@@ -4472,7 +4738,7 @@ function showAddTopic() {
   document.getElementById('new-topic-text').value = '';
   document.getElementById('new-topic-theme').value = '';
   // 渲染主题选择 chips
-  const themes = [...new Set(TOPICS.map(t => t.theme))];
+  const themes = [...new Set(TOPICS.map(t => t.theme)), '结构化面试'];
   document.getElementById('new-topic-theme-chips').innerHTML = themes.map(th =>
     `<button type="button" class="preset-btn" onclick="selectNewTheme('${th}', this)">${th}</button>`
   ).join('');
