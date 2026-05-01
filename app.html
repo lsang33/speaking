@@ -166,6 +166,8 @@ input:focus { outline: none; border-color: var(--gold); }
 #cfg-enable-optimize:checked + span::after { transform: translateY(-50%) translateX(18px); }
 #cfg-enable-highscore:checked + span { background: var(--gold) !important; }
 #cfg-enable-highscore:checked + span::after { transform: translateY(-50%) translateX(18px); }
+#cfg-interview-twostage:checked + span { background: var(--gold) !important; }
+#cfg-interview-twostage:checked + span::after { transform: translateY(-50%) translateX(18px); }
 #optimize-toggle-track::after { content:''; position:absolute; left:4px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
 .type-btn {
   flex: 1; padding: 11px; border-radius: 10px;
@@ -873,6 +875,18 @@ input:focus { outline: none; border-color: var(--gold); }
     </label>
   </div>
 
+  <!-- 面试生成模式 -->
+  <div class="flex" style="align-items:center; justify-content:space-between;">
+    <div>
+      <div class="label">面试示范两段式生成</div>
+      <div class="hint" style="font-size:12px; margin-top:2px;">先生成骨架再口语化，质量更高但耗时翻倍</div>
+    </div>
+    <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+      <input type="checkbox" id="cfg-interview-twostage" style="opacity:0; width:0; height:0;">
+      <span style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:13px;transition:.2s;" id="twostage-toggle-track"></span>
+    </label>
+  </div>
+
   <div class="mt-auto flex col gap-10">
     <button class="btn btn-gold" onclick="saveSettings()">保存</button>
     <button class="btn btn-ghost" style="color:var(--red);" onclick="confirmClearAll()">清空所有数据</button>
@@ -1235,6 +1249,7 @@ let S = {
   targetDur: ls('target_dur') || '2-3',
   enableOptimize: ls('enable_optimize') !== '0',
   enableHighScore: ls('enable_highscore') === '1',
+  interviewTwoStage: ls('interview_twostage') === '1',
   asrType: ls('asr_type') || 'browser',  // 'browser' | 'api'
   asrUrl:  ls('asr_url')  || '',
   asrKey:  ls('asr_key')  || '',
@@ -2679,6 +2694,7 @@ function goSettings() {
   document.getElementById('cfg-asr-model').value = S.asrModel || '';
   document.getElementById('cfg-enable-optimize').checked = S.enableOptimize;
   document.getElementById('cfg-enable-highscore').checked = S.enableHighScore;
+  document.getElementById('cfg-interview-twostage').checked = S.interviewTwoStage;
   updateTargetDurChips(S.targetDur);
   show('s-settings');
 }
@@ -2780,6 +2796,8 @@ function saveSettings() {
   ls('enable_optimize', S.enableOptimize ? '1' : '0');
   S.enableHighScore = document.getElementById('cfg-enable-highscore').checked;
   ls('enable_highscore', S.enableHighScore ? '1' : '0');
+  S.interviewTwoStage = document.getElementById('cfg-interview-twostage').checked;
+  ls('interview_twostage', S.interviewTwoStage ? '1' : '0');
   ls('target_dur', S.targetDur);
   goHome();
 }
@@ -4258,7 +4276,42 @@ async function generateExample() {
 
 【题目】${topic}`;
     try {
-      const result = await callLLM(civilPrompt, 2000);
+      let result;
+      if (S.interviewTwoStage) {
+        // 第一段：生成骨架
+        document.querySelector('#example-loading span').textContent = '生成答题骨架…';
+        const skeletonPrompt = `根据以下面试题目，生成简洁的答题骨架，不要展开，只列要点：
+
+判断题型，然后输出：
+题型：[题型名称]
+原因①：[一句话]
+原因②：[一句话]
+对策①：做什么 + 可以用什么例子（只列举，不展开）
+对策②：做什么 + 可以用什么例子
+结尾方向：[引到哪个层面，一句话]
+
+【题目】${topic}`;
+        const skeleton = await callLLM(skeletonPrompt, 400);
+
+        // 第二段：口语化展开
+        document.querySelector('#example-loading span').textContent = '口语化展开…';
+        const expandPrompt = `请把以下答题骨架，展开成面试现场口头作答的完整答案。
+
+要求：
+- 开头：各位考官好，考生开始答题
+- 语言像人在说话，自然直接，不像在念文章
+- 严格按骨架的结构，不增加新的原因或对策
+- 每条对策：说做什么+怎么做+一个真实案例细节，结尾说"这是解决XX的问题"
+- 不加粗，不用标题格式
+- 结尾2-3句，自然升华，不用引号对仗句
+- 字数：${durTarget}
+
+【骨架】
+${skeleton}`;
+        result = await callLLM(expandPrompt, 2000);
+      } else {
+        result = await callLLM(civilPrompt, 2000);
+      }
       document.getElementById('example-text').innerHTML = formatExample(result);
       output.style.display = 'block';
     } catch(e) {
