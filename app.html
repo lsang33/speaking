@@ -2901,9 +2901,7 @@ async function callLLM(prompt, maxTokens = 800, useThinkModel = false) {
     }
     const data = await res.json();
     const msg = data.choices?.[0]?.message;
-    const text = msg?.content || msg?.reasoning_content || '';
-    if (!text) throw new Error('模型返回内容为空，请检查模型名称是否正确');
-    return text;
+    return msg?.content || msg?.reasoning_content || '';
   } else {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -2924,9 +2922,7 @@ async function callLLM(prompt, maxTokens = 800, useThinkModel = false) {
       throw new Error(err.error?.message || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    const text = data.content?.[0]?.text || '';
-    if (!text) throw new Error('模型返回内容为空');
-    return text;
+    return data.content?.[0]?.text || '';
   }
 }
 
@@ -3774,7 +3770,11 @@ ${transcriptLabel}
   try {
     S.debugLastPrompt = prompt;
     S.debugLastResponse = '';
-    const evalText = await callLLM(prompt, 800);
+    let evalText = await callLLM(prompt, 800);
+    if (!evalText.trim()) {
+      await new Promise(r => setTimeout(r, 1500));
+      evalText = await callLLM(prompt, 800);
+    }
     S.debugLastResponse = evalText;
 
     const scoreM = evalText.match(/\*\*评分\*\*[：:]\s*(\d+)/);
@@ -3810,9 +3810,28 @@ ${transcriptLabel}
     if (S.enableOptimize) generateOptimized(session);
     if (S.enableHighScore) generateHighScore(session);
   } catch (err) {
-    alert('评估失败：' + err.message + '\n\n请检查 API Key 是否有效，以及网络连接。');
-    goHome();
+    const fallbackSession = {
+      id: S.sessionId, date: today(), mode: mode || 'topic',
+      topic: mode === 'word' ? `词语串联：${words.join('、')}` : mode === 'story' ? (S.storyTitle || '讲述模式') : topic.text,
+      theme: mode === 'word' ? '词语串联' : mode === 'story' ? '讲述模式' : topic.theme,
+      asrType: S.asrType || 'browser', duration, transcript: S.transcript,
+      evaluation: '', score: '—', metrics: analyzeTranscript(S.transcript, duration), audioMetrics: S.audioMetrics,
+    };
+    await saveSession(fallbackSession);
+    allSessions.unshift(fallbackSession);
+    S.history = allSessions;
+    showResult(fallbackSession, '');
+    const evalArea = document.getElementById('res-eval');
+    if (evalArea) evalArea.innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">评估获取失败，转写已保留<br><button onclick="retryEval()" style="margin-top:10px;background:none;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:6px 18px;cursor:pointer;font-size:13px;">重新评估</button></div>`;
   }
+}
+
+function retryEval() {
+  const session = allSessions[0];
+  if (!session) return;
+  S.transcript = session.transcript;
+  S.sessionId = session.id;
+  evaluate();
 }
 
 async function generateOptimized(session) {
