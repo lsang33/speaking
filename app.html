@@ -4112,7 +4112,7 @@ function showResult(session, evalText) {
   }
 
   // 已保存示范卡片
-  loadSavedExampleCard(session.topic?.text || '');
+  loadSavedExampleCard(typeof session.topic === 'string' ? session.topic : (session.topic?.text || ''));
   const topicSaveBtn = document.getElementById('example-topic-save-btn');
   if (topicSaveBtn) { topicSaveBtn.textContent = '存到题目'; topicSaveBtn.style.color = 'var(--muted)'; topicSaveBtn.style.borderColor = '#444'; }
 
