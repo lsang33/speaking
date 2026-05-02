@@ -3877,13 +3877,17 @@ async function generateVariant() {
   const saveBtn = document.getElementById('variant-save-btn');
   saveBtn.textContent = '加入题库'; saveBtn.style.color = 'var(--muted)'; saveBtn.style.borderColor = '#444';
 
-  const prompt = `根据以下公务员结构化面试原题，生成一道相关但不同的面试题。直接输出下面三行，不要任何多余文字：
-题型：[综合分析题/计划组织题/人际关系题/应急处置题/自我认知题 选一个]
-题目：[新题目，1-2句话，公务员考试风格]
+  const allSubtypes = ['综合分析题','计划组织题','人际关系题','应急处置题','自我认知题'];
+  const otherSubtypes = allSubtypes.filter(t => t !== subtype);
+  const targetType = otherSubtypes[Math.floor(Math.random() * otherSubtypes.length)];
+
+  const prompt = `根据以下公务员结构化面试原题，生成一道【${targetType}】类型的相关面试题。直接输出下面三行，不要任何多余文字：
+题型：${targetType}
+题目：[新题目，1-2句话，公务员考试风格，必须是${targetType}]
 联系：[一句话，说明和原题共同考查的能力以及新考查点]
 
 原题（${subtype}）：${topicText}
-要求：题型或场景与原题不同，属于同一政策领域或相近领域`;
+要求：属于同一政策领域或相近领域，场景与原题不同`;
 
   try {
     const result = await callLLM(prompt, 400);
