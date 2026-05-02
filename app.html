@@ -622,6 +622,7 @@ input:focus { outline: none; border-color: var(--gold); }
         <span class="muted" style="font-size:13px;">生成示范中…</span>
       </div>
       <div id="example-output" style="display:none;">
+        <div id="example-outline" style="display:none;background:#15151e;border-radius:10px;padding:12px 14px;margin-bottom:12px;border-left:3px solid var(--gold);"></div>
         <div class="example-body" id="example-text"></div>
         <button onclick="saveExampleToMaterials()" id="example-save-btn"
           style="margin-top:12px;background:none;border:1px solid #444;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 14px;width:100%;">
@@ -4312,6 +4313,8 @@ async function generateExample() {
 
   loading.style.display = 'flex';
   output.style.display = 'none';
+  const outlineEl = document.getElementById('example-outline');
+  if (outlineEl) outlineEl.style.display = 'none';
   const saveBtn = document.getElementById('example-save-btn');
   if (saveBtn) { saveBtn.textContent = '存入素材本'; saveBtn.disabled = false; saveBtn.style.color = 'var(--muted)'; saveBtn.style.borderColor = '#444'; }
 
@@ -4336,7 +4339,16 @@ async function generateExample() {
 应急处置题：按轻重缓急，控制局面→处理问题→事后复盘，每步具体。
 自我认知题：真实具体，结合经历举例，不说套话。
 
-格式：开头"各位考官好，考生开始答题"；不加粗不用标题；原因段、每条对策、结尾各为独立段落，段落之间空一行；字数：${durTarget}
+输出格式：先写提纲，再写正文，严格按以下结构，不要省略标记：
+【提纲】
+题型：[题型名称]
+① [要点，不超过20字]
+② [要点]
+③ [要点]
+（3-5条，覆盖定性/原因/对策/收尾）
+【正文】
+各位考官好，考生开始答题…（正文内容，${durTarget}，不加粗不用标题，原因段、每条对策、结尾各为独立段落，段落之间空一行）
+
 禁止：捏造第一人称亲身经历（"我有一个亲身经历"、"我曾经"等）；结尾禁止引号对仗句（"从'A'变成'B'"这类）
 
 【题目】${topic}`;
@@ -4377,7 +4389,7 @@ ${skeleton}`;
       } else {
         result = await callLLM(civilPrompt, 2000, true);
       }
-      document.getElementById('example-text').innerHTML = formatExample(result);
+      renderCivilExample(result);
       output.style.display = 'block';
     } catch(e) {
       output.innerHTML = '<div class="muted" style="font-size:13px;">生成失败，请重试</div>';
@@ -4415,6 +4427,26 @@ ${style.desc}
     output.style.display = 'block';
   } finally {
     loading.style.display = 'none';
+  }
+}
+
+function renderCivilExample(raw) {
+  const sep = raw.indexOf('【正文】');
+  const outlineEl = document.getElementById('example-outline');
+  const textEl = document.getElementById('example-text');
+  if (sep !== -1) {
+    const outlineRaw = raw.slice(0, sep).replace('【提纲】', '').trim();
+    const bodyRaw = raw.slice(sep + 4).trim();
+    outlineEl.innerHTML = outlineRaw.split('\n').filter(l => l.trim()).map(l => {
+      const line = l.trim();
+      const isTitle = line.startsWith('题型');
+      return `<div style="font-size:13px;line-height:1.9;color:${isTitle ? 'var(--gold)' : 'var(--text)'};${isTitle ? 'font-weight:600;margin-bottom:2px;' : ''}">${line}</div>`;
+    }).join('');
+    outlineEl.style.display = 'block';
+    textEl.innerHTML = formatExample(bodyRaw);
+  } else {
+    outlineEl.style.display = 'none';
+    textEl.innerHTML = formatExample(raw);
   }
 }
 
