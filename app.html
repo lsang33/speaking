@@ -685,6 +685,14 @@ input:focus { outline: none; border-color: var(--gold); }
   <div class="example-section" id="variant-section" style="display:none;">
     <button onclick="toggleVariant()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;" id="variant-toggle-btn">🔀 换个角度练 ▶</button>
     <div id="variant-expanded" style="display:none;margin-top:12px;">
+      <div class="flex gap-6" style="flex-wrap:wrap;margin-bottom:10px;">
+        <button class="preset-btn active" onclick="selectVariantType('',this)">随机</button>
+        <button class="preset-btn" onclick="selectVariantType('综合分析题',this)">综合分析</button>
+        <button class="preset-btn" onclick="selectVariantType('计划组织题',this)">计划组织</button>
+        <button class="preset-btn" onclick="selectVariantType('人际关系题',this)">人际关系</button>
+        <button class="preset-btn" onclick="selectVariantType('应急处置题',this)">应急处置</button>
+        <button class="preset-btn" onclick="selectVariantType('自我认知题',this)">自我认知</button>
+      </div>
       <div id="variant-loading" class="example-spin" style="display:none;">
         <div class="spin" style="width:18px;height:18px;border-width:2px;"></div>
         <span class="muted" style="font-size:13px;">生成中…</span>
@@ -3856,6 +3864,13 @@ ${transcriptLabel}
 }
 
 let _variantData = null;
+let _variantType = '';
+
+function selectVariantType(type, btn) {
+  _variantType = type;
+  document.querySelectorAll('#variant-expanded .preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
 
 function toggleVariant() {
   const expanded = document.getElementById('variant-expanded');
@@ -3879,7 +3894,7 @@ async function generateVariant() {
 
   const allSubtypes = ['综合分析题','计划组织题','人际关系题','应急处置题','自我认知题'];
   const otherSubtypes = allSubtypes.filter(t => t !== subtype);
-  const targetType = otherSubtypes[Math.floor(Math.random() * otherSubtypes.length)];
+  const targetType = _variantType || otherSubtypes[Math.floor(Math.random() * otherSubtypes.length)];
 
   const prompt = `根据以下公务员结构化面试原题，生成一道【${targetType}】类型的相关面试题。直接输出下面三行，不要任何多余文字：
 题型：${targetType}
@@ -4220,6 +4235,7 @@ function showResult(session, evalText) {
   document.getElementById('variant-loading').style.display = 'none';
   variantToggle.textContent = '🔀 换个角度练 ▶';
   _variantData = null;
+  _variantType = '';
   variantSection.style.display = session.theme === '结构化面试' ? 'block' : 'none';
   const topicSaveBtn = document.getElementById('example-topic-save-btn');
   if (topicSaveBtn) { topicSaveBtn.textContent = '存到题目'; topicSaveBtn.style.color = 'var(--muted)'; topicSaveBtn.style.borderColor = '#444'; }
