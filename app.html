@@ -283,6 +283,9 @@ input:focus { outline: none; border-color: var(--gold); }
 
 /* ── TOPIC BANK ── */
 .bank-section-title { font-size:11px; font-weight:700; color:var(--gold); letter-spacing:.6px; text-transform:uppercase; padding:12px 0 5px; }
+.mat-content { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.mat-content.mat-expanded { display:block; overflow:visible; }
+.mat-toggle { background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; padding:2px 0 0; text-align:left; }
 .bank-item { background:var(--card); border-radius:10px; padding:12px 14px; display:flex; align-items:flex-start; gap:10px; margin-bottom:5px; flex-wrap:wrap; }
 .bank-item-note { background:none; border:none; color:#555; font-size:13px; cursor:pointer; padding:2px 4px; flex-shrink:0; line-height:1; transition:color .15s; }
 .bank-item-note.has-note { color:var(--gold); }
@@ -1591,7 +1594,8 @@ function renderMaterialsPage() {
           <span class="theme-badge">${MAT_ICONS[m.tag] || ''} ${m.tag}</span>
           <span style="font-size:11px;color:var(--muted);">${m.date}</span>
         </div>
-        <div style="font-size:14px;line-height:1.6;">${m.content}</div>
+        <div id="mc-${m.id}" class="mat-content" style="font-size:14px;line-height:1.6;">${m.content}</div>
+        <button class="mat-toggle" onclick="toggleMatCard('mc-${m.id}',this)">展开 ▾</button>
         ${m.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.8;">🏷 ${m.usage}</div>` : '<div style="font-size:11px;color:#444;opacity:.7;">🏷 未添加备注</div>'}
         <div style="display:flex;gap:12px;">
           <button style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;" onclick="editMaterial('${m.id}')">编辑</button>
@@ -1615,7 +1619,8 @@ function renderMaterialsPage() {
           <span class="theme-badge">${MAT_ICONS[m.tag] || ''} ${m.tag}</span>
           ${saved ? '<span style="font-size:11px;color:var(--gold);">已收入</span>' : `<button style="background:none;border:none;color:var(--gold);font-size:12px;cursor:pointer;padding:0;" onclick="addPresetMaterial(${realIdx})">＋ 收入素材本</button>`}
         </div>
-        <div style="font-size:14px;line-height:1.6;">${m.content}</div>
+        <div id="mc-p${realIdx}" class="mat-content" style="font-size:14px;line-height:1.6;">${m.content}</div>
+        <button class="mat-toggle" onclick="toggleMatCard('mc-p${realIdx}',this)">展开 ▾</button>
         ${m.usage ? `<div style="font-size:11px;color:var(--gold);opacity:.8;">🏷 ${m.usage}</div>` : ''}
       </div>`;
     }).join('');
@@ -1627,6 +1632,12 @@ function renderMaterialsPage() {
 function setMatFilter(tag) {
   matFilter = tag;
   renderMaterialsPage();
+}
+
+function toggleMatCard(id, btn) {
+  const el = document.getElementById(id);
+  const expanded = el.classList.toggle('mat-expanded');
+  btn.textContent = expanded ? '收起 ▴' : '展开 ▾';
 }
 
 function setMatSearch(val) {
