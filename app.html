@@ -624,7 +624,7 @@ input:focus { outline: none; border-color: var(--gold); }
         <div id="saved-example-text" class="example-body"></div>
       </div>
     </div>
-    <button class="btn btn-ghost" id="example-btn" onclick="openExample()" style="width:100%;">生成示范</button>
+    <button class="btn btn-ghost" id="example-btn" onclick="openExample()" style="width:100%;">生成示范 ▶</button>
     <div id="example-expanded" style="display:none;">
       <div class="flex gap-6" id="example-style-chips" style="flex-wrap:wrap; margin:12px 0 4px;">
         <button class="preset-btn active" onclick="selectExStyle('natural',this)">自然对话</button>
@@ -4082,7 +4082,7 @@ function showResult(session, evalText) {
   document.getElementById('example-expanded').style.display = 'none';
   document.getElementById('example-output').style.display = 'none';
   document.getElementById('example-loading').style.display = 'none';
-  document.getElementById('example-btn').style.display = 'block';
+  document.getElementById('example-btn').textContent = '生成示范 ▶';
   document.getElementById('example-section').style.display = session.mode === 'story' ? 'none' : 'block';
 
   // 转写原文
@@ -4418,8 +4418,12 @@ function saveExampleToMaterials() {
 }
 
 function openExample() {
-  document.getElementById('example-expanded').style.display = 'block';
-  document.getElementById('example-btn').style.display = 'none';
+  const expanded = document.getElementById('example-expanded');
+  const btn = document.getElementById('example-btn');
+  const open = expanded.style.display === 'none';
+  expanded.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '生成示范 ▼' : '生成示范 ▶';
+  if (!open) return;
 }
 
 function selectExStyle(style, btn) {
