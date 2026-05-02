@@ -683,7 +683,7 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <!-- 变式练习 -->
   <div class="example-section" id="variant-section" style="display:none;">
-    <button onclick="toggleVariant()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;" id="variant-toggle-btn">🔀 换个角度练 ▶</button>
+    <button onclick="toggleVariant()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;" id="variant-toggle-btn">换个角度练 ▶</button>
     <div id="variant-expanded" style="display:none;margin-top:12px;">
       <div class="flex gap-6" style="flex-wrap:wrap;margin-bottom:10px;">
         <button class="preset-btn active" onclick="selectVariantType('',this)">随机</button>
@@ -3877,7 +3877,7 @@ function toggleVariant() {
   const btn = document.getElementById('variant-toggle-btn');
   const open = expanded.style.display === 'none';
   expanded.style.display = open ? 'block' : 'none';
-  btn.textContent = open ? '🔀 换个角度练 ▼' : '🔀 换个角度练 ▶';
+  btn.textContent = open ? '换个角度练 ▼' : '换个角度练 ▶';
   if (open && !_variantData) generateVariant();
 }
 
@@ -4233,7 +4233,7 @@ function showResult(session, evalText) {
   document.getElementById('variant-expanded').style.display = 'none';
   document.getElementById('variant-output').style.display = 'none';
   document.getElementById('variant-loading').style.display = 'none';
-  variantToggle.textContent = '🔀 换个角度练 ▶';
+  variantToggle.textContent = '换个角度练 ▶';
   _variantData = null;
   _variantType = '';
   variantSection.style.display = session.theme === '结构化面试' ? 'block' : 'none';
