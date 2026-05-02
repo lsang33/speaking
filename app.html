@@ -425,6 +425,15 @@ input:focus { outline: none; border-color: var(--gold); }
     <span id="r-hint-text"></span>
   </div>
 
+  <!-- 已保存示范 -->
+  <div id="ready-saved-card" style="display:none;background:var(--card);border-radius:var(--r);padding:14px 16px;">
+    <button onclick="toggleReadySaved(this)" id="ready-saved-toggle" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;width:100%;text-align:left;">📌 已保存的示范 ▶</button>
+    <div id="ready-saved-body" style="display:none;margin-top:12px;">
+      <div id="ready-saved-outline" style="display:none;background:#15151e;border-radius:10px;padding:12px 14px;margin-bottom:10px;border-left:3px solid var(--gold);"></div>
+      <div id="ready-saved-text" class="example-body"></div>
+    </div>
+  </div>
+
   <!-- 素材支架 + 素材本 -->
   <div id="scaffold-wrap" class="flex col gap-8">
     <div class="flex gap-8">
@@ -2285,6 +2294,7 @@ function goReady() {
   const readyBtn = document.getElementById('ready-start-btn');
   readyBtn.style.display = 'block';
   readyBtn.textContent = '准备好了，开始录音';
+  loadReadySavedCard(S.topic?.text || '');
   show('s-ready');
 }
 
@@ -4353,27 +4363,45 @@ function toggleSavedExample(btn) {
   btn.textContent = btn.textContent.replace(open ? '▶' : '▼', open ? '▼' : '▶');
 }
 
+function renderOutlineInto(el, outlineText) {
+  if (!outlineText) { el.style.display = 'none'; return; }
+  el.innerHTML = outlineText.split('\n').filter(l => l.trim()).map(l => {
+    const line = l.trim();
+    const isTitle = line.startsWith('题型');
+    return `<div style="font-size:13px;line-height:1.9;color:${isTitle ? 'var(--gold)' : 'var(--text)'};${isTitle ? 'font-weight:600;' : ''}">${line}</div>`;
+  }).join('');
+  el.style.display = 'block';
+}
+
 function loadSavedExampleCard(topicText) {
   const savedCard = document.getElementById('saved-example-card');
   if (!savedCard) return;
   const ex = topicText ? getTopicExample(topicText) : null;
   if (!ex) { savedCard.style.display = 'none'; return; }
-  const toggle = document.getElementById('saved-example-toggle');
-  toggle.textContent = `📌 已保存的示范  ${ex.date} ▶`;
-  const outlineEl = document.getElementById('saved-example-outline');
-  if (ex.outline) {
-    outlineEl.innerHTML = ex.outline.split('\n').filter(l => l.trim()).map(l => {
-      const line = l.trim();
-      const isTitle = line.startsWith('题型');
-      return `<div style="font-size:13px;line-height:1.9;color:${isTitle ? 'var(--gold)' : 'var(--text)'};${isTitle ? 'font-weight:600;' : ''}">${line}</div>`;
-    }).join('');
-    outlineEl.style.display = 'block';
-  } else {
-    outlineEl.style.display = 'none';
-  }
+  document.getElementById('saved-example-toggle').textContent = `📌 已保存的示范  ${ex.date} ▶`;
+  renderOutlineInto(document.getElementById('saved-example-outline'), ex.outline);
   document.getElementById('saved-example-text').innerHTML = formatExample(ex.content);
   document.getElementById('saved-example-body').style.display = 'none';
   savedCard.style.display = 'block';
+}
+
+function loadReadySavedCard(topicText) {
+  const card = document.getElementById('ready-saved-card');
+  if (!card) return;
+  const ex = topicText ? getTopicExample(topicText) : null;
+  if (!ex) { card.style.display = 'none'; return; }
+  document.getElementById('ready-saved-toggle').textContent = `📌 已保存的示范  ${ex.date} ▶`;
+  renderOutlineInto(document.getElementById('ready-saved-outline'), ex.outline);
+  document.getElementById('ready-saved-text').innerHTML = formatExample(ex.content);
+  document.getElementById('ready-saved-body').style.display = 'none';
+  card.style.display = 'block';
+}
+
+function toggleReadySaved(btn) {
+  const body = document.getElementById('ready-saved-body');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  btn.textContent = btn.textContent.replace(open ? '▶' : '▼', open ? '▼' : '▶');
 }
 
 function saveExampleToMaterials() {
