@@ -1345,8 +1345,8 @@ function computeLongestStreak() {
 }
 
 /* ── 素材本 ── */
-const MAT_TAGS = ['亲身经历','社会观察','金句观点','诗词名句','数据案例'];
-const MAT_ICONS = { '亲身经历':'📖', '社会观察':'👁', '金句观点':'💬', '诗词名句':'🎋', '数据案例':'📊' };
+const MAT_TAGS = ['亲身经历','社会观察','金句观点','诗词名句','数据案例','真实案例'];
+const MAT_ICONS = { '亲身经历':'📖', '社会观察':'👁', '金句观点':'💬', '诗词名句':'🎋', '数据案例':'📊', '真实案例':'🗂' };
 
 function loadMaterials() {
   try { return JSON.parse(ls('materials') || '[]'); } catch(e) { return []; }
