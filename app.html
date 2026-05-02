@@ -681,6 +681,25 @@ input:focus { outline: none; border-color: var(--gold); }
     <div id="res-transcript-text" style="display:none;margin-top:10px;font-size:13px;color:var(--muted);line-height:1.65;"></div>
   </div>
 
+  <!-- 变式练习 -->
+  <div class="example-section" id="variant-section" style="display:none;">
+    <button onclick="toggleVariant()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;" id="variant-toggle-btn">🔀 换个角度练 ▶</button>
+    <div id="variant-expanded" style="display:none;margin-top:12px;">
+      <div id="variant-loading" class="example-spin" style="display:none;">
+        <div class="spin" style="width:18px;height:18px;border-width:2px;"></div>
+        <span class="muted" style="font-size:13px;">生成中…</span>
+      </div>
+      <div id="variant-output" style="display:none;" class="flex col gap-10">
+        <div id="variant-hint" style="font-size:12px;color:var(--muted);line-height:1.6;padding:8px 12px;background:#15151e;border-radius:8px;border-left:3px solid #444;"></div>
+        <div id="variant-topic" style="font-size:15px;font-weight:500;line-height:1.6;color:var(--text);"></div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="generateVariant()" id="variant-retry-btn" style="flex:1;background:none;border:1px solid #444;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 10px;">换一个</button>
+          <button onclick="saveVariantTopic()" id="variant-save-btn" style="flex:1;background:none;border:1px solid #444;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 10px;">加入题库</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 调试面板 -->
   <div id="debug-panel" style="display:none;">
     <div style="background:#111; border-radius:var(--r); overflow:hidden;">
@@ -3836,6 +3855,79 @@ ${transcriptLabel}
   }
 }
 
+let _variantData = null;
+
+function toggleVariant() {
+  const expanded = document.getElementById('variant-expanded');
+  const btn = document.getElementById('variant-toggle-btn');
+  const open = expanded.style.display === 'none';
+  expanded.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '🔀 换个角度练 ▼' : '🔀 换个角度练 ▶';
+  if (open && !_variantData) generateVariant();
+}
+
+async function generateVariant() {
+  const session = allSessions[0];
+  if (!session) return;
+  const topicText = typeof session.topic === 'string' ? session.topic : (session.topic?.text || '');
+  const subtype = S.topic?.subtype || '综合分析题';
+
+  document.getElementById('variant-output').style.display = 'none';
+  document.getElementById('variant-loading').style.display = 'flex';
+  const saveBtn = document.getElementById('variant-save-btn');
+  saveBtn.textContent = '加入题库'; saveBtn.style.color = 'var(--muted)'; saveBtn.style.borderColor = '#444';
+
+  const prompt = `你是结构化面试出题专家。根据以下原题，生成一道相关但不同的结构化面试题。
+
+【原题】${topicText}
+【原题题型】${subtype}
+【主题领域】${session.theme}
+
+要求：
+- 同一政策领域或相近领域，角度、题型或具体场景与原题不同
+- 必须是真实公务员考试风格，语言简洁，1-2句话
+- 可以换题型（如综合分析→计划组织/人际关系/应急处置）或迁移到相近领域
+- 不要和原题太相似
+
+严格按以下格式输出，不要多余内容：
+【题型】[题型名称]
+【题目】[题目内容]
+【联系】[一句话：和原题考查的共同能力，以及这道题新考查什么]`;
+
+  try {
+    const result = await callLLM(prompt, 400);
+    const typeM = result.match(/【题型】(.+)/);
+    const topicM = result.match(/【题目】([\s\S]+?)(?=【|$)/);
+    const hintM = result.match(/【联系】([\s\S]+?)(?=【|$)/);
+    const newType = typeM?.[1]?.trim() || '';
+    const newTopic = topicM?.[1]?.trim() || result.trim();
+    const hint = hintM?.[1]?.trim() || '';
+    _variantData = { text: newTopic, theme: '结构化面试', subtype: newType };
+    document.getElementById('variant-hint').textContent = hint;
+    document.getElementById('variant-topic').innerHTML = `<span class="theme-badge">${newType}</span><span style="display:block;margin-top:8px;">${newTopic}</span>`;
+    document.getElementById('variant-output').style.display = 'flex';
+  } catch(e) {
+    document.getElementById('variant-output').innerHTML = '<div class="muted" style="font-size:13px;">生成失败，请重试</div>';
+    document.getElementById('variant-output').style.display = 'flex';
+  } finally {
+    document.getElementById('variant-loading').style.display = 'none';
+  }
+}
+
+function saveVariantTopic() {
+  if (!_variantData) return;
+  const customs = loadCustomTopics();
+  if (customs.some(t => t.text === _variantData.text)) {
+    const btn = document.getElementById('variant-save-btn');
+    btn.textContent = '已在题库 ✓'; btn.style.color = 'var(--gold)'; btn.style.borderColor = 'var(--gold)';
+    return;
+  }
+  customs.unshift({ text: _variantData.text, theme: _variantData.theme, subtype: _variantData.subtype, d: 2 });
+  saveCustomTopics(customs);
+  const btn = document.getElementById('variant-save-btn');
+  btn.textContent = '已加入题库 ✓'; btn.style.color = 'var(--gold)'; btn.style.borderColor = 'var(--gold)';
+}
+
 function retryEval() {
   const session = allSessions[0];
   if (!session) return;
@@ -4123,6 +4215,16 @@ function showResult(session, evalText) {
 
   // 已保存示范卡片
   loadSavedExampleCard(typeof session.topic === 'string' ? session.topic : (session.topic?.text || ''));
+
+  // 变式练习（仅结构化面试）
+  const variantSection = document.getElementById('variant-section');
+  const variantToggle = document.getElementById('variant-toggle-btn');
+  document.getElementById('variant-expanded').style.display = 'none';
+  document.getElementById('variant-output').style.display = 'none';
+  document.getElementById('variant-loading').style.display = 'none';
+  variantToggle.textContent = '🔀 换个角度练 ▶';
+  _variantData = null;
+  variantSection.style.display = session.theme === '结构化面试' ? 'block' : 'none';
   const topicSaveBtn = document.getElementById('example-topic-save-btn');
   if (topicSaveBtn) { topicSaveBtn.textContent = '存到题目'; topicSaveBtn.style.color = 'var(--muted)'; topicSaveBtn.style.borderColor = '#444'; }
 
