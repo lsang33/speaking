@@ -3877,31 +3877,23 @@ async function generateVariant() {
   const saveBtn = document.getElementById('variant-save-btn');
   saveBtn.textContent = '加入题库'; saveBtn.style.color = 'var(--muted)'; saveBtn.style.borderColor = '#444';
 
-  const prompt = `你是结构化面试出题专家。根据以下原题，生成一道相关但不同的结构化面试题。
+  const prompt = `根据以下公务员结构化面试原题，生成一道相关但不同的面试题。直接输出下面三行，不要任何多余文字：
+题型：[综合分析题/计划组织题/人际关系题/应急处置题/自我认知题 选一个]
+题目：[新题目，1-2句话，公务员考试风格]
+联系：[一句话，说明和原题共同考查的能力以及新考查点]
 
-【原题】${topicText}
-【原题题型】${subtype}
-【主题领域】${session.theme}
-
-要求：
-- 同一政策领域或相近领域，角度、题型或具体场景与原题不同
-- 必须是真实公务员考试风格，语言简洁，1-2句话
-- 可以换题型（如综合分析→计划组织/人际关系/应急处置）或迁移到相近领域
-- 不要和原题太相似
-
-严格按以下格式输出，不要多余内容：
-【题型】[题型名称]
-【题目】[题目内容]
-【联系】[一句话：和原题考查的共同能力，以及这道题新考查什么]`;
+原题（${subtype}）：${topicText}
+要求：题型或场景与原题不同，属于同一政策领域或相近领域`;
 
   try {
     const result = await callLLM(prompt, 400);
-    const typeM = result.match(/【题型】(.+)/);
-    const topicM = result.match(/【题目】([\s\S]+?)(?=【|$)/);
-    const hintM = result.match(/【联系】([\s\S]+?)(?=【|$)/);
-    const newType = typeM?.[1]?.trim() || '';
-    const newTopic = topicM?.[1]?.trim() || result.trim();
+    const typeM = result.match(/题型[：:]\s*(.+)/);
+    const topicM = result.match(/题目[：:]\s*([\s\S]+?)(?=\n联系|$)/);
+    const hintM = result.match(/联系[：:]\s*([\s\S]+?)$/);
+    const newType = typeM?.[1]?.trim().replace(/[【】\[\]]/g, '') || '';
+    const newTopic = topicM?.[1]?.trim() || '';
     const hint = hintM?.[1]?.trim() || '';
+    if (!newTopic) throw new Error('解析失败');
     _variantData = { text: newTopic, theme: '结构化面试', subtype: newType };
     document.getElementById('variant-hint').textContent = hint;
     document.getElementById('variant-topic').innerHTML = `<span class="theme-badge">${newType}</span><span style="display:block;margin-top:8px;">${newTopic}</span>`;
