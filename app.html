@@ -607,6 +607,14 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <!-- 示范参考 -->
   <div class="example-section" id="example-section">
+    <!-- 已保存示范 -->
+    <div id="saved-example-card" style="display:none;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #222;">
+      <button onclick="toggleSavedExample(this)" id="saved-example-toggle" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;width:100%;text-align:left;">📌 已保存的示范 ▶</button>
+      <div id="saved-example-body" style="display:none;margin-top:10px;">
+        <div id="saved-example-outline" style="display:none;background:#15151e;border-radius:10px;padding:12px 14px;margin-bottom:10px;border-left:3px solid var(--gold);"></div>
+        <div id="saved-example-text" class="example-body"></div>
+      </div>
+    </div>
     <button class="btn btn-ghost" id="example-btn" onclick="openExample()" style="width:100%;">生成示范</button>
     <div id="example-expanded" style="display:none;">
       <div class="flex gap-6" id="example-style-chips" style="flex-wrap:wrap; margin:12px 0 4px;">
@@ -624,10 +632,16 @@ input:focus { outline: none; border-color: var(--gold); }
       <div id="example-output" style="display:none;">
         <div id="example-outline" style="display:none;background:#15151e;border-radius:10px;padding:12px 14px;margin-bottom:12px;border-left:3px solid var(--gold);"></div>
         <div class="example-body" id="example-text"></div>
-        <button onclick="saveExampleToMaterials()" id="example-save-btn"
-          style="margin-top:12px;background:none;border:1px solid #444;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 14px;width:100%;">
-          存入素材本
-        </button>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button onclick="saveExampleToMaterials()" id="example-save-btn"
+            style="flex:1;background:none;border:1px solid #444;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 10px;">
+            存入素材本
+          </button>
+          <button onclick="saveExampleToTopic()" id="example-topic-save-btn"
+            style="flex:1;background:none;border:1px solid #444;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 10px;">
+            存到题目
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -4073,6 +4087,11 @@ function showResult(session, evalText) {
     }
   }
 
+  // 已保存示范卡片
+  loadSavedExampleCard(session.topic?.text || '');
+  const topicSaveBtn = document.getElementById('example-topic-save-btn');
+  if (topicSaveBtn) { topicSaveBtn.textContent = '存到题目'; topicSaveBtn.style.color = 'var(--muted)'; topicSaveBtn.style.borderColor = '#444'; }
+
   show('s-result');
 }
 
@@ -4277,6 +4296,61 @@ const EXAMPLE_STYLES = {
 语言：规范有层次，口语化，避免空话套话，每句话都在推进论点。`,
   },
 };
+
+function getSavedTopicExamples() {
+  try { return JSON.parse(localStorage.getItem('topic_saved_examples') || '{}'); } catch { return {}; }
+}
+function getTopicExample(text) { return getSavedTopicExamples()[text] || null; }
+function saveTopicExampleData(text, obj) {
+  const data = getSavedTopicExamples();
+  data[text] = obj;
+  localStorage.setItem('topic_saved_examples', JSON.stringify(data));
+}
+
+function saveExampleToTopic() {
+  const topicText = S.topic?.text;
+  if (!topicText) return;
+  const content = document.getElementById('example-text')?.innerText?.trim();
+  if (!content) return;
+  const outlineEl = document.getElementById('example-outline');
+  const outline = (outlineEl?.style.display !== 'none') ? (outlineEl?.innerText?.trim() || '') : '';
+  const styleLabel = EXAMPLE_STYLES[_exStyle]?.label || (_exStyle === 'civil' ? '面试' : '示范');
+  saveTopicExampleData(topicText, { content, outline, style: styleLabel, date: today() });
+  // 更新卡片
+  loadSavedExampleCard(topicText);
+  const btn = document.getElementById('example-topic-save-btn');
+  if (btn) { btn.textContent = '已存到题目 ✓'; btn.style.color = 'var(--gold)'; btn.style.borderColor = 'var(--gold)'; }
+}
+
+function toggleSavedExample(btn) {
+  const body = document.getElementById('saved-example-body');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  btn.textContent = btn.textContent.replace(open ? '▶' : '▼', open ? '▼' : '▶');
+}
+
+function loadSavedExampleCard(topicText) {
+  const savedCard = document.getElementById('saved-example-card');
+  if (!savedCard) return;
+  const ex = topicText ? getTopicExample(topicText) : null;
+  if (!ex) { savedCard.style.display = 'none'; return; }
+  const toggle = document.getElementById('saved-example-toggle');
+  toggle.textContent = `📌 已保存的示范  ${ex.date} ▶`;
+  const outlineEl = document.getElementById('saved-example-outline');
+  if (ex.outline) {
+    outlineEl.innerHTML = ex.outline.split('\n').filter(l => l.trim()).map(l => {
+      const line = l.trim();
+      const isTitle = line.startsWith('题型');
+      return `<div style="font-size:13px;line-height:1.9;color:${isTitle ? 'var(--gold)' : 'var(--text)'};${isTitle ? 'font-weight:600;' : ''}">${line}</div>`;
+    }).join('');
+    outlineEl.style.display = 'block';
+  } else {
+    outlineEl.style.display = 'none';
+  }
+  document.getElementById('saved-example-text').innerHTML = formatExample(ex.content);
+  document.getElementById('saved-example-body').style.display = 'none';
+  savedCard.style.display = 'block';
+}
 
 function saveExampleToMaterials() {
   const text = document.getElementById('example-text')?.innerText?.trim();
@@ -4752,6 +4826,8 @@ function renderTopicsPage() {
   const favs = loadFavorites();
   const customs = loadCustomTopics();
   const notes = loadTopicNotes();
+  const savedEx = getSavedTopicExamples();
+  const exBadge = text => savedEx[text] ? '<span style="font-size:10px;color:var(--gold);margin-left:4px;vertical-align:middle;">🔖</span>' : '';
   const themes = [...new Set(TOPICS.map(t => t.theme))];
 
   // ── 搜索模式 ──
@@ -4777,7 +4853,7 @@ function renderTopicsPage() {
         return `<div class="bank-item${done ? ' practiced' : ''}">
           <div class="bank-item-text">
             <span class="theme-badge">${t.theme}</span>
-            <span style="display:block;margin-top:4px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
+            <span style="display:block;margin-top:4px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</span>
           </div>
           <div class="flex gap-6" style="flex-shrink:0;align-items:center;">
             ${noteBtn(t.text, notes)}
@@ -4834,7 +4910,7 @@ function renderTopicsPage() {
           ${favBtn(text, favs)}
           <button class="bank-item-practice" data-favtext="${text.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" onclick="startFavoriteTopic(this.dataset.favtext)">练习</button>
         </div>
-        <span style="font-size:14px; line-height:1.5;">${text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
+        <span style="font-size:14px; line-height:1.5;">${text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(text)}</span>
         ${noteArea(text, notes)}
       </div>`;
     }).join('');
@@ -4850,7 +4926,7 @@ function renderTopicsPage() {
       const idx = INTERVIEW_TOPICS.indexOf(t);
       const done = practiced.has(t.text);
       return `<div class="bank-item${done ? ' practiced' : ''}">
-        <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</div>
+        <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</div>
         <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
           ${noteBtn(t.text, notes)}
           ${favBtn(t.text, favs)}
@@ -4870,7 +4946,7 @@ function renderTopicsPage() {
       return `<div class="bank-item${done ? ' practiced' : ''}">
         <div class="bank-item-text">
           <span class="theme-badge">${t.theme}</span>
-          <span style="display:block;margin-top:5px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</span>
+          <span style="display:block;margin-top:5px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</span>
         </div>
         <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
           ${noteBtn(t.text, notes)}
@@ -4892,7 +4968,7 @@ function renderTopicsPage() {
       const idx = TOPICS.indexOf(t);
       const done = practiced.has(t.text);
       return `<div class="bank-item${done ? ' practiced' : ''}">
-        <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}</div>
+        <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</div>
         <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
           ${noteBtn(t.text, notes)}
           ${favBtn(t.text, favs)}
