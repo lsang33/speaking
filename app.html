@@ -2930,6 +2930,7 @@ async function callLLM(prompt, maxTokens = 800, useThinkModel = false) {
         model,
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
+        ...(useThinkModel ? {} : { thinking: { type: 'disabled' } }),
       }),
     });
     if (!res.ok) {
