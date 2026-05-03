@@ -4052,7 +4052,7 @@ ${session.transcript}
 【题目】${session.topic}`;
 
   try {
-    const text = await callLLM(hsPrompt, 4000, style === 'interview');
+    const text = await callLLM(hsPrompt, 4000, true);
     session.highScore = session.highScore || {};
     session.highScore[style] = text;
     await saveSession(session);
