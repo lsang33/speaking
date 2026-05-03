@@ -2930,7 +2930,7 @@ async function callLLM(prompt, maxTokens = 800, useThinkModel = false, noThink =
         model,
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
-        ...(noThink ? { thinking: { type: 'disabled' } } : {}),
+        ...(noThink ? { thinking: { type: 'disabled' }, enable_thinking: false } : {}),
       }),
     });
     if (!res.ok) {
@@ -2939,10 +2939,21 @@ async function callLLM(prompt, maxTokens = 800, useThinkModel = false, noThink =
     }
     const data = await res.json();
     const msg = data.choices?.[0]?.message;
-    // Strip <think>...</think> blocks (some proxies embed reasoning inline in content)
-    const stripThink = s => (s || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-    const content = stripThink(msg?.content);
+
+    // 1. Try content field, stripping think blocks
+    const rawContent = msg?.content || '';
+    let content = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    // Handle unclosed <think> tag (response truncated inside thinking)
+    if (content.includes('<think>')) content = content.replace(/<think>[\s\S]*/gi, '').trim();
     if (content) return content;
+
+    // 2. Fallback: extract formatted answer from reasoning_content
+    // (some proxies never populate content, final answer is at end of reasoning)
+    const reasoning = msg?.reasoning_content || '';
+    if (reasoning) {
+      const m = reasoning.search(/\*\*(逻辑结构|叙事结构|词语串联|语言流畅度)[：:]/);
+      if (m !== -1) return reasoning.slice(m).trim();
+    }
     return '';
   } else {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
