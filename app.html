@@ -2912,7 +2912,7 @@ function updateTargetDurChips(val) {
 /* ═══════════════════════════════════════
    LLM CALL
 ═══════════════════════════════════════ */
-async function callLLM(prompt, maxTokens = 800, useThinkModel = false, noThink = false) {
+async function callLLM(prompt, maxTokens = 800, useThinkModel = false) {
   const type = S.apiType || 'anthropic';
   const key = S.apiKey;
   const baseModel = S.apiModel || (type === 'anthropic' ? 'claude-haiku-4-5' : '');
@@ -2930,7 +2930,6 @@ async function callLLM(prompt, maxTokens = 800, useThinkModel = false, noThink =
         model,
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
-        ...(noThink ? { thinking: { type: 'disabled' }, enable_thinking: false } : {}),
       }),
     });
     if (!res.ok) {
@@ -3747,8 +3746,7 @@ ${transcriptLabel}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
-
-请直接按上述格式输出，不要有任何分析过程或思考步骤。`;
+`;
   } else if (mode === 'story') {
     // ── 讲述模式模式 ──
     const catNameMap = { movie: '电影', book: '书籍', experience: '亲身经历', news: '新闻事件' };
@@ -3786,8 +3784,7 @@ ${transcriptLabel}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
-
-请直接按上述格式输出，不要有任何分析过程或思考步骤。`;
+`;
   } else {
     // ── 普通题目模式 ──
     prompt = `你是口才训练教练，正在评估一位以央视主持人大赛为目标的学员。${asrAccurateNote}
@@ -3822,17 +3819,16 @@ ${transcriptLabel}
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
-
-请直接按上述格式输出，不要有任何分析过程或思考步骤。`;
+`;
   }
 
   try {
     S.debugLastPrompt = prompt;
     S.debugLastResponse = '';
-    let evalText = await callLLM(prompt, 4000, false, true);
+    let evalText = await callLLM(prompt, 16000);
     if (!evalText.trim()) {
       await new Promise(r => setTimeout(r, 1500));
-      evalText = await callLLM(prompt, 4000, false, true);
+      evalText = await callLLM(prompt, 16000);
     }
     S.debugLastResponse = evalText;
 
@@ -3927,7 +3923,7 @@ async function generateVariant() {
 要求：属于同一政策领域或相近领域，场景与原题不同`;
 
   try {
-    const result = await callLLM(prompt, 1200, false, true);
+    const result = await callLLM(prompt, 4000);
     const typeM = result.match(/题型[：:]\s*(.+)/);
     const topicM = result.match(/题目[：:]\s*([\s\S]+?)(?=\n联系|$)/);
     const hintM = result.match(/联系[：:]\s*([\s\S]+?)$/);
@@ -3982,7 +3978,7 @@ ${session.transcript}`;
     const section = document.getElementById('optimize-section');
     if (section) { section.style.display = 'block'; }
     if (el) el.innerHTML = '<span style="color:var(--muted);font-size:13px;">优化版本生成中…</span>';
-    const text = await callLLM(optimizePrompt, 3000, false, true);
+    const text = await callLLM(optimizePrompt, 8000);
     session.optimized = text;
     await saveSession(session);
     const idx = allSessions.findIndex(s => s.id === session.id);
