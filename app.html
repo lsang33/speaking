@@ -2938,7 +2938,11 @@ async function callLLM(prompt, maxTokens = 800, useThinkModel = false) {
     }
     const data = await res.json();
     const msg = data.choices?.[0]?.message;
-    return msg?.content || msg?.reasoning_content || '';
+    // Strip <think>...</think> blocks (some proxies embed reasoning inline in content)
+    const stripThink = s => (s || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const content = stripThink(msg?.content);
+    if (content) return content;
+    return '';
   } else {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -2959,7 +2963,7 @@ async function callLLM(prompt, maxTokens = 800, useThinkModel = false) {
       throw new Error(err.error?.message || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    return data.content?.[0]?.text || '';
+    return data.content?.find(b => b.type === 'text')?.text || '';
   }
 }
 
@@ -3807,10 +3811,10 @@ ${transcriptLabel}
   try {
     S.debugLastPrompt = prompt;
     S.debugLastResponse = '';
-    let evalText = await callLLM(prompt, 800);
+    let evalText = await callLLM(prompt, 2000);
     if (!evalText.trim()) {
       await new Promise(r => setTimeout(r, 1500));
-      evalText = await callLLM(prompt, 800);
+      evalText = await callLLM(prompt, 2000);
     }
     S.debugLastResponse = evalText;
 
