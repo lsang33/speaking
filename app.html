@@ -2109,7 +2109,7 @@ function retryHistSession(id) {
     S.storyTitle = h.storyTitle || '';
   }
   S.topic = { text: h.topic, theme: h.theme, d: 2 };
-  if (h.mode === 'word') { goWordReady(); }
+  if (h.mode === 'word') { renderWordReady(); updateWCToggle(); show('s-word-ready'); startWordPrepTimer(); }
   else if (h.mode === 'story') { goStorySetup(); }
   else { goReady(); }
 }
