@@ -711,6 +711,7 @@ input:focus { outline: none; border-color: var(--gold); }
   <!-- 调试面板 -->
   <div id="debug-panel" style="display:none;">
     <div style="background:#111; border-radius:var(--r); overflow:hidden;">
+      <div id="debug-diag" style="padding:8px 14px; border-bottom:1px solid #222; font-size:11px; color:var(--muted); font-family:monospace;"></div>
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-bottom:1px solid #222;">
         <span style="font-size:12px; color:var(--muted); font-family:monospace;">发送给大模型的 Prompt</span>
         <button onclick="copyDebugPrompt()" style="font-size:11px; color:var(--gold); background:none; border:none; cursor:pointer; padding:0;">复制</button>
@@ -2331,6 +2332,10 @@ function toggleDebugPanel() {
   const btn = document.getElementById('debug-btn');
   const open = panel.style.display === 'none';
   if (open) {
+    const d = S.debugLastDiag;
+    document.getElementById('debug-diag').textContent = d
+      ? `finish_reason: ${d.finish_reason}  |  content: ${d.contentLen} chars  |  reasoning: ${d.reasoningLen} chars`
+      : '（仅 OpenAI 路径有诊断数据）';
     document.getElementById('debug-prompt').textContent = S.debugLastPrompt || '（无数据）';
     document.getElementById('debug-response').textContent = S.debugLastResponse || '（无数据）';
   }
@@ -2938,6 +2943,11 @@ async function callLLM(prompt, maxTokens = 800, useThinkModel = false) {
     }
     const data = await res.json();
     const msg = data.choices?.[0]?.message;
+    S.debugLastDiag = {
+      finish_reason: data.choices?.[0]?.finish_reason || '?',
+      contentLen: (msg?.content || '').length,
+      reasoningLen: (msg?.reasoning_content || '').length,
+    };
 
     // 1. Try content field, stripping think blocks
     const rawContent = msg?.content || '';
