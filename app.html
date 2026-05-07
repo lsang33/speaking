@@ -3875,6 +3875,7 @@ ${transcriptLabel}
     if (S.enableOptimize) generateOptimized(session);
     if (S.enableHighScore) generateHighScore(session);
   } catch (err) {
+    S.debugLastResponse = `[错误] ${err.message}`;
     const fallbackSession = {
       id: S.sessionId, date: today(), mode: mode || 'topic',
       topic: mode === 'word' ? `词语串联：${words.join('、')}` : mode === 'story' ? (S.storyTitle || '讲述模式') : topic.text,
