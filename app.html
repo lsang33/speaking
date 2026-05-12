@@ -3996,7 +3996,7 @@ async function generateVariant() {
     document.getElementById('variant-topic').innerHTML = `<span class="theme-badge">${newType}</span><span style="display:block;margin-top:8px;">${newTopic}</span>`;
     document.getElementById('variant-output').style.display = 'flex';
   } catch(e) {
-    document.getElementById('variant-output').innerHTML = '<div class="muted" style="font-size:13px;">生成失败，请重试</div>';
+    document.getElementById('variant-output').innerHTML = `<div class="muted" style="font-size:13px;">生成失败：${e.message}</div>`;
     document.getElementById('variant-output').style.display = 'flex';
   } finally {
     document.getElementById('variant-loading').style.display = 'none';
@@ -4134,7 +4134,7 @@ ${session.transcript}
     if (idx >= 0) allSessions[idx] = session;
     if (out) out.innerHTML = formatExample(text);
   } catch(e) {
-    if (out) out.innerHTML = '<span style="color:var(--muted);font-size:13px;">生成失败，请重试</span>';
+    if (out) out.innerHTML = `<span style="color:var(--muted);font-size:13px;">生成失败：${e.message}</span>`;
   }
 }
 
@@ -4714,7 +4714,7 @@ ${skeleton}`;
       renderCivilExample(result);
       output.style.display = 'block';
     } catch(e) {
-      output.innerHTML = '<div class="muted" style="font-size:13px;">生成失败，请重试</div>';
+      output.innerHTML = `<div class="muted" style="font-size:13px;">生成失败：${e.message}</div>`;
       output.style.display = 'block';
     } finally {
       loading.style.display = 'none';
@@ -4745,7 +4745,7 @@ ${style.desc}
     document.getElementById('example-text').innerHTML = formatExample(result);
     output.style.display = 'block';
   } catch(e) {
-    output.innerHTML = '<div class="muted" style="font-size:13px;">生成失败，请重试</div>';
+    output.innerHTML = `<div class="muted" style="font-size:13px;">生成失败：${e.message}</div>`;
     output.style.display = 'block';
   } finally {
     loading.style.display = 'none';
