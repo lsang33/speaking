@@ -170,6 +170,8 @@ input:focus { outline: none; border-color: var(--gold); }
 #cfg-interview-twostage:checked + span::after { transform: translateY(-50%) translateX(18px); }
 #cfg-enable-think-model:checked + span { background: var(--gold) !important; }
 #cfg-enable-think-model:checked + span::after { transform: translateY(-50%) translateX(18px); }
+#cfg-eval-thinking:checked + span { background: var(--gold) !important; }
+#cfg-eval-thinking:checked + span::after { transform: translateY(-50%) translateX(18px); }
 #optimize-toggle-track::after { content:''; position:absolute; left:4px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
 .type-btn {
   flex: 1; padding: 11px; border-radius: 10px;
@@ -815,6 +817,20 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="hint" id="model-hint" style="font-size:12px; line-height:1.6;"></div>
   </div>
 
+  <!-- 评分思考开关 -->
+  <div class="flex col gap-8">
+    <div class="flex" style="align-items:center; justify-content:space-between;">
+      <div>
+        <div class="label">评分时使用思考模式</div>
+        <div class="hint" style="font-size:12px; margin-top:2px;">关闭后评分不等待思考过程，更快但细节可能略少</div>
+      </div>
+      <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+        <input type="checkbox" id="cfg-eval-thinking" style="opacity:0; width:0; height:0;">
+        <span style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:13px;transition:.2s;"></span>
+      </label>
+    </div>
+  </div>
+
   <!-- 进阶模型 -->
   <div class="flex col gap-8">
     <div class="flex" style="align-items:center; justify-content:space-between;">
@@ -1330,6 +1346,7 @@ let S = {
   enableHighScore: ls('enable_highscore') === '1',
   interviewTwoStage: ls('interview_twostage') === '1',
   enableThinkModel: ls('enable_think_model') === '1',
+  evalThinking: ls('eval_thinking') !== '0', // default true
   thinkModel: ls('think_model') || '',
   asrType: ls('asr_type') || 'browser',  // 'browser' | 'api'
   asrUrl:  ls('asr_url')  || '',
@@ -2790,6 +2807,7 @@ function goSettings() {
   document.getElementById('cfg-enable-highscore').checked = S.enableHighScore;
   document.getElementById('cfg-interview-twostage').checked = S.interviewTwoStage;
   document.getElementById('cfg-enable-think-model').checked = S.enableThinkModel;
+  document.getElementById('cfg-eval-thinking').checked = S.evalThinking;
   document.getElementById('cfg-think-model').value = S.thinkModel;
   updateTargetDurChips(S.targetDur);
   show('s-settings');
@@ -2900,6 +2918,8 @@ function saveSettings() {
   S.thinkModel = document.getElementById('cfg-think-model').value.trim();
   ls('enable_think_model', S.enableThinkModel ? '1' : '0');
   ls('think_model', S.thinkModel);
+  S.evalThinking = document.getElementById('cfg-eval-thinking').checked;
+  ls('eval_thinking', S.evalThinking ? '1' : '0');
   ls('target_dur', S.targetDur);
   goHome();
 }
@@ -2917,74 +2937,103 @@ function updateTargetDurChips(val) {
 /* ═══════════════════════════════════════
    LLM CALL
 ═══════════════════════════════════════ */
-async function callLLM(prompt, maxTokens = 800, useThinkModel = false) {
+async function callLLM(prompt, maxTokens = 800, useThinkModel = false, disableThinking = false) {
   const type = S.apiType || 'anthropic';
   const key = S.apiKey;
   const baseModel = S.apiModel || (type === 'anthropic' ? 'claude-haiku-4-5' : '');
   const model = (useThinkModel && S.enableThinkModel && S.thinkModel) ? S.thinkModel : baseModel;
   const baseUrl = (S.apiUrl || '').replace(/\/$/, '');
 
+  const maxRetries = 2;
+
   if (type === 'openai') {
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
-    }
-    const data = await res.json();
-    const msg = data.choices?.[0]?.message;
-    S.debugLastDiag = {
-      finish_reason: data.choices?.[0]?.finish_reason || '?',
-      contentLen: (msg?.content || '').length,
-      reasoningLen: (msg?.reasoning_content || '').length,
-    };
+    let lastErr;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      let res;
+      try {
+        res = await fetch(`${baseUrl}/v1/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${key}`,
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: maxTokens,
+            messages: [{ role: 'user', content: prompt }],
+            ...(disableThinking ? { thinking: { type: 'disabled' } } : {}),
+          }),
+        });
+      } catch (e) {
+        lastErr = e;
+        if (attempt < maxRetries && (e instanceof TypeError)) {
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+        throw e;
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const msg = data.choices?.[0]?.message;
+      S.debugLastDiag = {
+        finish_reason: data.choices?.[0]?.finish_reason || '?',
+        contentLen: (msg?.content || '').length,
+        reasoningLen: (msg?.reasoning_content || '').length,
+      };
 
-    // 1. Try content field, stripping think blocks
-    const rawContent = msg?.content || '';
-    let content = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-    // Handle unclosed <think> tag (response truncated inside thinking)
-    if (content.includes('<think>')) content = content.replace(/<think>[\s\S]*/gi, '').trim();
-    if (content) return content;
+      // 1. Try content field, stripping think blocks
+      const rawContent = msg?.content || '';
+      let content = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      if (content.includes('<think>')) content = content.replace(/<think>[\s\S]*/gi, '').trim();
+      if (content) return content;
 
-    // 2. Fallback: extract formatted answer from reasoning_content
-    // (some proxies never populate content, final answer is at end of reasoning)
-    const reasoning = msg?.reasoning_content || '';
-    if (reasoning) {
-      const m = reasoning.search(/\*\*(逻辑结构|叙事结构|词语串联|语言流畅度)[：:]/);
-      if (m !== -1) return reasoning.slice(m).trim();
+      // 2. Fallback: extract formatted answer from reasoning_content
+      const reasoning = msg?.reasoning_content || '';
+      if (reasoning) {
+        const m = reasoning.search(/\*\*(逻辑结构|叙事结构|词语串联|语言流畅度)[：:]/);
+        if (m !== -1) return reasoning.slice(m).trim();
+      }
+      return '';
     }
-    return '';
+    throw lastErr;
   } else {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    let lastErr;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      let res;
+      try {
+        res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': key,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: maxTokens,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+      } catch (e) {
+        lastErr = e;
+        if (attempt < maxRetries && (e instanceof TypeError)) {
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+        throw e;
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      return data.content?.find(b => b.type === 'text')?.text || '';
     }
-    const data = await res.json();
-    return data.content?.find(b => b.type === 'text')?.text || '';
+    throw lastErr;
   }
 }
 
@@ -3835,10 +3884,10 @@ ${transcriptLabel}
   try {
     S.debugLastPrompt = prompt;
     S.debugLastResponse = '';
-    let evalText = await callLLM(prompt, 16000);
+    let evalText = await callLLM(prompt, 16000, false, !S.evalThinking);
     if (!evalText.trim()) {
       await new Promise(r => setTimeout(r, 1500));
-      evalText = await callLLM(prompt, 16000);
+      evalText = await callLLM(prompt, 16000, false, !S.evalThinking);
     }
     S.debugLastResponse = evalText;
 
