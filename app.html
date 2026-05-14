@@ -610,6 +610,8 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <div class="topic-card" style="padding:14px 18px;" id="res-topic-display"></div>
 
+  <div id="res-labels"></div>
+
   <div id="res-metrics"></div>
 
   <div id="res-evals" class="flex col gap-10"></div>
@@ -687,6 +689,10 @@ input:focus { outline: none; border-color: var(--gold); }
   <div class="example-section" id="variant-section" style="display:none;">
     <button onclick="toggleVariant()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;" id="variant-toggle-btn">换个角度练 ▶</button>
     <div id="variant-expanded" style="display:none;margin-top:12px;">
+      <label id="variant-label-toggle" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:6px;cursor:pointer;">
+        <input type="checkbox" id="cfg-variant-same-label" onchange="onVariantLabelToggle()" style="accent-color:var(--gold);width:14px;height:14px;">
+        同标签 <span id="variant-label-hint" style="color:#555;"></span> <span style="color:#555;font-size:11px;">（跨题型找同结构话题）</span>
+      </label>
       <div class="flex gap-6" style="flex-wrap:wrap;margin-bottom:10px;">
         <button class="preset-btn active" onclick="selectVariantType('',this)">随机</button>
         <button class="preset-btn" onclick="selectVariantType('综合分析题',this)">综合分析</button>
@@ -3795,7 +3801,14 @@ ${transcriptLabel}
 3-4分：覆盖＜60%词语，或逻辑混乱，口头禅≥6次，或卡顿停顿≥3次
 1-2分：基本未覆盖词语，或内容极少
 
+【题目标签参考——判断本题最匹配的标签，每类别选一个】
+问题性质：形式主义/懒政怠政/脱离群众/本领恐慌/政绩观偏差/制度滞后
+价值导向：人民至上/实事求是/系统思维/守正创新/共建共治共享/公平正义
+逻辑关系：活力与秩序/发展与安全/效率与公平/短期与长远/整体与个体/传统与现代
+
 【输出格式——严格按此，每项不超过2句】
+
+**题目标签**：[问题性质] | [价值导向] | [逻辑关系]
 
 **词语串联**：[哪些词语用得自然？哪些生硬或遗漏？]
 **逻辑结构**：[有无完整的观点-论据-升华，衔接是否流畅]
@@ -3833,7 +3846,14 @@ ${transcriptLabel}
 3-4分：结构混乱，情节不完整，细节极少，或口头禅≥6次，或卡顿严重
 1-2分：内容极少，无法形成完整故事
 
+【题目标签参考——判断本题最匹配的标签，每类别选一个】
+问题性质：形式主义/懒政怠政/脱离群众/本领恐慌/政绩观偏差/制度滞后
+价值导向：人民至上/实事求是/系统思维/守正创新/共建共治共享/公平正义
+逻辑关系：活力与秩序/发展与安全/效率与公平/短期与长远/整体与个体/传统与现代
+
 【输出格式——严格按此，每项不超过2句】
+
+**题目标签**：[问题性质] | [价值导向] | [逻辑关系]
 
 **叙事结构**：[背景/冲突/转折/结局四要素是否完整？哪个环节最弱]
 **细节生动性**：[有无具体画面、细节或情感描写？是否流于抽象概括]
@@ -3869,7 +3889,14 @@ ${transcriptLabel}
 3-4分：思路混乱，口头禅 ≥6 次，或卡顿停顿≥3次，或严重偏题，或时长极短
 1-2分：内容极少、无关主题或无法理解
 
+【题目标签参考——判断本题最匹配的标签，每类别选一个】
+问题性质：形式主义/懒政怠政/脱离群众/本领恐慌/政绩观偏差/制度滞后
+价值导向：人民至上/实事求是/系统思维/守正创新/共建共治共享/公平正义
+逻辑关系：活力与秩序/发展与安全/效率与公平/短期与长远/整体与个体/传统与现代
+
 【输出格式——严格按此，每项不超过2句】
+
+**题目标签**：[问题性质] | [价值导向] | [逻辑关系]
 
 **逻辑结构**：[有无观点-论据-升华层次，结构是否完整]
 **语言流畅度**：[结合口头禅和停顿数据评价，口头禅点名，长停顿须指出]
@@ -3894,6 +3921,10 @@ ${transcriptLabel}
     const scoreM = evalText.match(/\*\*评分\*\*[：:]\s*(\d+)/);
     const score = scoreM ? scoreM[1] : '—';
 
+    const labelM = evalText.match(/\*\*题目标签\*\*[：:]\s*(.+)/);
+    const labelStr = labelM ? labelM[1].trim().replace(/[*_#]/g, '').replace(/[\[\]【】]/g, '') : '';
+    const labelParts = labelStr ? labelStr.split('|').map(s => s.trim()).filter(Boolean) : [];
+
     const session = {
       id: S.sessionId,
       date: today(),
@@ -3910,6 +3941,7 @@ ${transcriptLabel}
       transcript: S.transcript,
       evaluation: evalText,
       score,
+      labels: labelParts.length === 3 ? { problem: labelParts[0], value: labelParts[1], logic: labelParts[2] } : null,
       optimized: '',
       highScore: '',
       metrics: analyzeTranscript(S.transcript, duration),
@@ -3943,6 +3975,11 @@ ${transcriptLabel}
 
 let _variantData = null;
 let _variantType = '';
+let _variantSameLabel = false;
+
+function onVariantLabelToggle() {
+  _variantSameLabel = document.getElementById('cfg-variant-same-label').checked;
+}
 
 function selectVariantType(type, btn) {
   _variantType = type;
@@ -3974,13 +4011,17 @@ async function generateVariant() {
   const otherSubtypes = allSubtypes.filter(t => t !== subtype);
   const targetType = _variantType || otherSubtypes[Math.floor(Math.random() * otherSubtypes.length)];
 
+  const labelConstraint = _variantSameLabel && session?.labels
+    ? `\n标签约束：新题必须与以下标签一致——${session.labels.problem}、${session.labels.value}、${session.labels.logic}。在"联系"中说明标签如何共通。`
+    : '';
+
   const prompt = `根据以下公务员结构化面试原题，生成一道【${targetType}】类型的相关面试题。直接输出下面三行，不要任何多余文字：
 题型：${targetType}
 题目：[新题目，1-2句话，公务员考试风格，必须是${targetType}]
 联系：[一句话，说明和原题共同考查的能力以及新考查点]
 
 原题（${subtype}）：${topicText}
-要求：属于同一政策领域或相近领域，场景与原题不同`;
+要求：属于同一政策领域或相近领域，场景与原题不同${labelConstraint}`;
 
   try {
     const result = await callLLM(prompt, 4000);
@@ -4150,6 +4191,14 @@ function showResult(session, evalText) {
     `<div class="label" style="margin-bottom:6px;">${session.theme}</div>
      <div style="font-size:15px;font-weight:500;line-height:1.5;">${session.topic}</div>`;
 
+  document.getElementById('res-labels').innerHTML = session.labels
+    ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+         <span style="background:#1a1a2e;color:var(--gold);font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid #333;">${session.labels.problem}</span>
+         <span style="background:#1a1a2e;color:#aaa;font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid #333;">${session.labels.value}</span>
+         <span style="background:#1a1a2e;color:#aaa;font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid #333;">${session.labels.logic}</span>
+       </div>`
+    : '';
+
   // ── 合并卡片：客观数据 + AI 评估 + 评分理由 ──
   const tm = session.metrics;
   const am = session.audioMetrics;
@@ -4314,6 +4363,17 @@ function showResult(session, evalText) {
   variantToggle.textContent = '换个角度练 ▶';
   _variantData = null;
   _variantType = '';
+  _variantSameLabel = false;
+  const labelToggle = document.getElementById('variant-label-toggle');
+  const labelCheck = document.getElementById('cfg-variant-same-label');
+  const labelHint = document.getElementById('variant-label-hint');
+  labelCheck.checked = false;
+  if (session.labels) {
+    labelToggle.style.display = 'flex';
+    labelHint.textContent = `(${session.labels.problem} | ${session.labels.value} | ${session.labels.logic})`;
+  } else {
+    labelToggle.style.display = 'none';
+  }
   variantSection.style.display = session.theme === '结构化面试' ? 'block' : 'none';
   const topicSaveBtn = document.getElementById('example-topic-save-btn');
   if (topicSaveBtn) { topicSaveBtn.textContent = '存到题目'; topicSaveBtn.style.color = 'var(--muted)'; topicSaveBtn.style.borderColor = '#444'; }
