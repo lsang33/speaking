@@ -4959,6 +4959,14 @@ function renderPickerThemes() {
   ).join('');
 }
 
+function toggleRealFilter() {
+  if (topicsFilter === 'real') { topicsFilter = 'all'; } else { topicsFilter = 'real'; }
+  renderTopics();
+  if (topicsFilter === 'real') {
+    setTimeout(() => { document.getElementById('topics-sec-真题')?.scrollIntoView({ behavior: 'smooth' }); }, 100);
+  }
+}
+
 function setPickerTheme(theme) {
   pickerTheme = theme;
   renderPickerThemes();
@@ -5026,6 +5034,7 @@ function pickRandom() {
    TOPIC BANK
 ═══════════════════════════════════════ */
 let topicsSearch = '';
+let topicsFilter = 'all'; // 'all' | 'real'
 
 function setTopicsSearch(val) {
   topicsSearch = val.trim();
@@ -5177,8 +5186,10 @@ function renderTopicsPage() {
   }
 
   document.getElementById('topics-tab-bar').style.display = '';
+  const realCount = TOPICS.filter(t => t.source).length + INTERVIEW_TOPICS.filter(t => t.source).length;
   const tabThemes = [
     ...(favs.size ? ['收藏'] : []),
+    '真题',
     '结构化面试',
     ...(customs.length ? ['自定义题目'] : []),
     ...themes,
@@ -5190,10 +5201,11 @@ function renderTopicsPage() {
   INTERVIEW_TOPICS.forEach(() => { themeCount['结构化面试'] = (themeCount['结构化面试'] || 0) + 1; });
   customs.forEach(t => { themeCount['自定义题目'] = (themeCount['自定义题目'] || 0) + 1; });
   if (favs.size) themeCount['收藏'] = favs.size;
+  themeCount['真题'] = realCount;
 
   // 顶部标签栏
   document.getElementById('topics-tab-bar').innerHTML = tabThemes.map(th =>
-    `<button class="filter-btn" onclick="topicsScrollTo('topics-sec-${th}')">${th}<span style="font-size:10px;opacity:.6;margin-left:3px;">${themeCount[th] || ''}</span></button>`
+    `<button class="filter-btn${th === '真题' && topicsFilter === 'real' ? ' active' : ''}" onclick="${th === '真题' ? 'toggleRealFilter()' : `topicsScrollTo('topics-sec-${th}')`}">${th}<span style="font-size:10px;opacity:.6;margin-left:3px;">${themeCount[th] || ''}</span></button>`
   ).join('');
 
   let html = '';
@@ -5222,6 +5234,34 @@ function renderTopicsPage() {
         ${noteArea(text, notes)}
       </div>`;
     }).join('');
+  }
+
+  // ── 真题筛选模式 ──
+  if (topicsFilter === 'real') {
+    const allReal = [
+      ...TOPICS.filter(t => t.source).map(t => ({ ...t, _type: 'topic', _idx: TOPICS.indexOf(t) })),
+      ...INTERVIEW_TOPICS.filter(t => t.source).map(t => ({ ...t, _type: 'interview', _idx: INTERVIEW_TOPICS.indexOf(t) })),
+    ];
+    const sources = [...new Set(allReal.map(t => t.source))].sort();
+    html += `<div id="topics-sec-真题" class="bank-section-title" style="color:var(--gold);">📋 历年真题（${allReal.length}题）</div>`;
+    sources.forEach(src => {
+      const srcQs = allReal.filter(t => t.source === src);
+      html += `<div class="interview-subtype">${src}（${srcQs.length}题）</div>`;
+      html += srcQs.map((t, _) => {
+        const done = practiced.has(t.text);
+        return `<div class="bank-item${done ? ' practiced' : ''}">
+          <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</div>
+          <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
+            ${noteBtn(t.text, notes)}
+            ${favBtn(t.text, favs)}
+            <button class="bank-item-practice" onclick="${t._type === 'interview' ? `startInterviewTopic(${t._idx})` : `startBuiltinTopic(${t._idx})`}">练习</button>
+          </div>
+          ${noteArea(t.text, notes)}
+        </div>`;
+      }).join('');
+    });
+    document.getElementById('topics-list').innerHTML = html;
+    return;
   }
 
   // ── 结构化面试独立分区 ──
