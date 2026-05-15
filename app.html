@@ -4961,7 +4961,7 @@ function renderPickerThemes() {
 
 function toggleRealFilter() {
   if (topicsFilter === 'real') { topicsFilter = 'all'; } else { topicsFilter = 'real'; }
-  renderTopics();
+  renderTopicsPage();
   if (topicsFilter === 'real') {
     setTimeout(() => { document.getElementById('topics-sec-真题')?.scrollIntoView({ behavior: 'smooth' }); }, 100);
   }
@@ -5273,8 +5273,9 @@ function renderTopicsPage() {
     html += INTERVIEW_TOPICS.filter(t => t.subtype === sub).map((t, _) => {
       const idx = INTERVIEW_TOPICS.indexOf(t);
       const done = practiced.has(t.text);
+      const srcBadge = t.source ? `<span style="font-size:10px;color:var(--gold);margin-left:4px;border:1px solid var(--gold);border-radius:4px;padding:0 4px;">真题</span>` : '';
       return `<div class="bank-item${done ? ' practiced' : ''}">
-        <div class="bank-item-text">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</div>
+        <div class="bank-item-text">${t.text}${srcBadge}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</div>
         <div class="flex gap-6" style="flex-shrink:0; align-items:center;">
           ${noteBtn(t.text, notes)}
           ${favBtn(t.text, favs)}
