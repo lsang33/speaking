@@ -517,6 +517,11 @@ input:focus { outline: none; border-color: var(--gold); }
       <div style="font-weight:600; font-size:16px;">随机生成论点</div>
       <div class="muted" style="font-size:12px; margin-top:4px;">AI随机出题，可选限定领域和难度</div>
     </div>
+    <div class="exp-source-card" onclick="expFromTheme()">
+      <div class="exp-source-icon">🏷️</div>
+      <div style="font-weight:600; font-size:16px;">按问题类型</div>
+      <div class="muted" style="font-size:12px; margin-top:4px;">选一个主题，生成该类型通用的可迁移论点</div>
+    </div>
   </div>
 
   <!-- 路径1展开：题库选择 -->
@@ -575,6 +580,23 @@ input:focus { outline: none; border-color: var(--gold); }
     <button class="btn btn-gold" onclick="expRandomGenerate()" style="font-size:15px;">🎲 生成论点</button>
     <div class="exp-loading" id="exp-random-loading" style="display:none;">
       <div class="spin" style="width:18px;height:18px;"></div> AI正在生成论点…
+    </div>
+  </div>
+
+  <!-- 路径4展开：按问题类型 -->
+  <div id="exp-theme-panel" style="display:none;" class="flex col gap-12">
+    <div>
+      <div class="label" style="margin-bottom:10px;">选择问题类型</div>
+      <div class="flex gap-6" style="flex-wrap:wrap;" id="exp-theme-chips">
+        <!-- JS 动态填充 -->
+      </div>
+    </div>
+    <div id="exp-theme-info" style="display:none;" class="card flex col gap-8">
+      <div class="label" id="exp-theme-kw-label"></div>
+      <div class="muted" id="exp-theme-examples" style="font-size:12px; line-height:1.6;"></div>
+    </div>
+    <div class="exp-loading" id="exp-theme-loading" style="display:none;">
+      <div class="spin" style="width:18px;height:18px;"></div> AI正在生成可迁移论点…
     </div>
   </div>
 
@@ -2378,6 +2400,7 @@ function goHome() {
   S.words = [];
   _expState = { source: '', sourceTopic: null, argument: '', directions: [], duration: 90, domain: '', difficulty: 'medium' };
   _expClaimsCache = {};
+  _expThemeCache = {};
   computeStreak();
   const now = new Date();
   const days = ['日','一','二','三','四','五','六'];
@@ -3457,12 +3480,15 @@ function goExpSource() {
   S.mode = 'expansion';
   _expState = { source: '', sourceTopic: null, argument: '', directions: [], duration: 90, domain: '', difficulty: 'medium' };
   _expClaimsCache = {};
+  _expThemeCache = {};
   // 重置面板
   document.getElementById('exp-source-choices').style.display = '';
   document.getElementById('exp-topics-panel').style.display = 'none';
   document.getElementById('exp-claims-panel').style.display = 'none';
   document.getElementById('exp-manual-panel').style.display = 'none';
   document.getElementById('exp-random-panel').style.display = 'none';
+  document.getElementById('exp-theme-panel').style.display = 'none';
+  document.getElementById('exp-theme-info').style.display = 'none';
   document.getElementById('exp-claim-list').innerHTML = '';
   document.getElementById('exp-manual-input').value = '';
   document.getElementById('exp-topics-list').classList.remove('collapsed');
@@ -3748,8 +3774,111 @@ async function expReroll() {
     else goExpSource();
   } else if (_expState.source === 'random') {
     await expRandomGenerate();
+  } else if (_expState.source === 'theme' && _expState.domain) {
+    document.getElementById('exp-source-choices').style.display = 'none';
+    document.getElementById('exp-theme-panel').style.display = '';
+    document.getElementById('exp-theme-info').style.display = '';
+    await expSelectTheme(_expState.domain);
   } else {
     goExpSource();
+  }
+}
+
+// ── 路径 4：按问题类型 ──
+const EXP_THEMES = [
+  { id: '形式主义·基层减负', kw: '痕迹管理 指尖打卡 以文件落实 减负不减责' },
+  { id: '政绩观念·考核激励', kw: '面子工程 数据注水 考核错位 短视决策' },
+  { id: '法治建设·依法行政', kw: '柔性执法 首违不罚 执法温度 舆论监督' },
+  { id: '为民服务·群众路线', kw: '窗口服务 信访接待 调研实效 最后一公里' },
+  { id: '应急处突·安全稳定', kw: '突发事件 舆情应对 食品安全 安全生产' },
+  { id: '数字治理·网络舆情', kw: '数字政府 政务APP 网络谣言 AI应用' },
+  { id: '乡村振兴·城乡融合', kw: '空心化 产业扶持 文旅融合 基层善治' },
+  { id: '生态文明·绿色发展', kw: '双碳目标 生态补偿 绿色转型 环保执法' },
+  { id: '科技创新·新质生产力', kw: '自主创新 AI产业 卡脖子 产业升级' },
+  { id: '青年就业·干部成长', kw: '慢就业 躺平 基层历练 职业规划' },
+  { id: '文化自信·价值引领', kw: '传统文化 核心价值观 文化创新 精神文明' },
+];
+let _expThemeCache = {};  // { [themeId]: { argument, directions } }
+
+function expFromTheme() {
+  document.getElementById('exp-source-choices').style.display = 'none';
+  document.getElementById('exp-topics-panel').style.display = 'none';
+  document.getElementById('exp-manual-panel').style.display = 'none';
+  document.getElementById('exp-random-panel').style.display = 'none';
+  document.getElementById('exp-theme-panel').style.display = '';
+  _expState.source = 'theme';
+  _expState.sourceTopic = null;
+  document.getElementById('exp-theme-info').style.display = 'none';
+  // 渲染 theme chips
+  document.getElementById('exp-theme-chips').innerHTML = EXP_THEMES.map(t =>
+    `<button class="exp-domain-chip" onclick="expSelectTheme('${t.id}')">${t.id.split('·')[0]}<span style="font-size:10px;opacity:.6;margin-left:3px;">${t.id.split('·')[1]||''}</span></button>`
+  ).join('');
+}
+
+async function expSelectTheme(themeId) {
+  const theme = EXP_THEMES.find(t => t.id === themeId);
+  if (!theme) return;
+  _expState.domain = themeId;
+
+  // 高亮选中
+  document.querySelectorAll('#exp-theme-chips .exp-domain-chip').forEach(b => b.classList.remove('active'));
+  const chips = document.querySelectorAll('#exp-theme-chips .exp-domain-chip');
+  const idx = EXP_THEMES.findIndex(t => t.id === themeId);
+  if (chips[idx]) chips[idx].classList.add('active');
+
+  // 显示关键词 + 示例题目
+  const examples = INTERVIEW_TOPICS.filter(t => t.theme === themeId);
+  const exampleHtml = examples.slice(0, 3).map(t =>
+    `<div style="margin-bottom:4px;">· ${t.text.slice(0, 45)}${t.text.length > 45 ? '…' : ''}${t.source ? ' <span class="exp-source-badge">真题</span>' : ''}</div>`
+  ).join('');
+  document.getElementById('exp-theme-kw-label').textContent = '关键词：' + theme.kw;
+  document.getElementById('exp-theme-examples').innerHTML = `
+    <div style="margin-bottom:6px;color:var(--text);">示例题目（${examples.length}道）：</div>
+    ${exampleHtml || '<div class="muted">暂无示例题目</div>'}
+  `;
+  document.getElementById('exp-theme-info').style.display = '';
+
+  // 有缓存直接显示
+  if (_expThemeCache[themeId]) {
+    _expState.argument = _expThemeCache[themeId].argument;
+    _expState.directions = _expThemeCache[themeId].directions;
+    expShowReady();
+    return;
+  }
+
+  // AI 生成可迁移论点
+  document.getElementById('exp-theme-loading').style.display = 'flex';
+  const kwList = theme.kw.split(' ').join('、');
+  const prompt = `你是一位公务员结构化面试培训专家。学员正在练习"${themeId}"类问题的答题框架。
+
+该类问题的关键词包括：${kwList}
+
+请生成一个针对"${themeId}"类问题的【可迁移论点】——该论点应该是一句有态度的观点（15-30字），能够作为多道同类题目的核心答题框架，而不是针对某一道具体题目。
+
+同时提供 3 条展开方向提示，每条 10-15 字，覆盖不同论证角度。
+
+输出格式（严格按此）：
+论点：xxx
+→ xxx
+→ xxx
+→ xxx`;
+
+  try {
+    const result = await callLLM(prompt, 600);
+    const argM = result.match(/论点[：:]\s*(.+)/);
+    const dirs = [...result.matchAll(/→\s*(.+)/g)].map(m => m[1].trim());
+    const argument = argM?.[1]?.trim() || '';
+    const directions = dirs.slice(0, 3);
+    if (!argument) throw new Error('论点生成失败');
+    if (!directions.length) directions.push('分析问题根源和深层原因', '结合实际案例说明', '提出可操作的解决路径');
+    _expThemeCache[themeId] = { argument, directions };
+    _expState.argument = argument;
+    _expState.directions = directions;
+    expShowReady();
+  } catch(e) {
+    alert('生成失败：' + e.message);
+  } finally {
+    document.getElementById('exp-theme-loading').style.display = 'none';
   }
 }
 
