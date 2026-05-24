@@ -3870,22 +3870,38 @@ async function expThemeGenerate(forceRefresh = false) {
   document.getElementById('exp-theme-gen-btn').style.display = 'none';
   document.getElementById('exp-theme-loading').style.display = 'flex';
   const kwList = theme.kw.split(' ').join('、');
-  const prompt = `你是一位公务员结构化面试培训专家。学员正在练习"${themeId}"类问题的答题框架。
+  const prompt = `你是公务员结构化面试教练。请为"${themeId}"类问题生成一个【可以直接在答题中当做核心论点使用的句子】。
 
-该类问题的关键词包括：${kwList}
+## 什么是好的论点
+- 揭示一个反直觉的因果机制，不是表态或喊口号
+- 一句话就能撑起整段论述的"脊柱"
+- 能在同类多道题中复用，不只针对某一道题
 
-请生成一个针对"${themeId}"类问题的【可迁移论点】——该论点应该是一句有态度的观点（15-30字），能够作为多道同类题目的核心答题框架，而不是针对某一道具体题目。
+## 禁止
+- 政策标语（如"坚持以人民为中心""深化改革开放"）
+- 万能套话（如"这个问题具有重要的现实意义"）
+- "要...""应该..."式的空洞呼吁
 
-同时提供 3 条展开方向提示，每条 10-15 字，覆盖不同论证角度。
+## 示例
+对于"形式主义·基层减负"类：
+✅ 基层不是在应付工作，而是在应付一个只看痕迹不看实效的考核体系
+❌ 要坚决反对形式主义，切实为基层减负
 
-输出格式（严格按此）：
-论点：xxx
-→ xxx
-→ xxx
-→ xxx`;
+对于"为民服务·群众路线"类：
+✅ 群众满不满意不看我们做了多少，看群众得到了多少
+❌ 要坚持以人民为中心，全心全意为人民服务
+
+## 要求
+关键词参考：${theme.kw.split(' ').join('、')}
+
+输出格式（严格按此，不要任何多余文字）：
+论点：[一句话，15-35字，有观点态度，自带论证框架]
+→ [展开方向1，10-15字]
+→ [展开方向2，10-15字]
+→ [展开方向3，10-15字]`;
 
   try {
-    const result = await callLLM(prompt, 600);
+    const result = await callLLM(prompt, 800);
     const argM = result.match(/论点[：:]\s*(.+)/);
     const dirs = [...result.matchAll(/→\s*(.+)/g)].map(m => m[1].trim());
     const argument = argM?.[1]?.trim() || '';
