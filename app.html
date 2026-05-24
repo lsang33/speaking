@@ -3408,6 +3408,327 @@ function updateSettingsWCChips(n) {
   [2,3,4,5].forEach((v,i) => chips[i] && chips[i].classList.toggle('active', v === n));
 }
 
+// ── 论点展开模式 ──
+let _expState = {
+  source: '',           // 'topic' | 'manual' | 'random'
+  sourceTopic: null,    // 来源题目 { text, subtype } (仅 topic 路径)
+  argument: '',         // 论点句
+  directions: [],       // AI 展开方向
+  duration: 90,         // 目标时长(秒)
+  domain: '',           // 领域 (仅 random)
+  difficulty: 'medium', // 难度 (仅 random)
+};
+let _expTopicFilter = 'all';
+
+function goExpSource() {
+  S.mode = 'expansion';
+  _expState = { source: '', sourceTopic: null, argument: '', directions: [], duration: 90, domain: '', difficulty: 'medium' };
+  // 重置面板
+  document.getElementById('exp-source-choices').style.display = '';
+  document.getElementById('exp-topics-panel').style.display = 'none';
+  document.getElementById('exp-claims-panel').style.display = 'none';
+  document.getElementById('exp-manual-panel').style.display = 'none';
+  document.getElementById('exp-random-panel').style.display = 'none';
+  document.getElementById('exp-claim-list').innerHTML = '';
+  document.getElementById('exp-manual-input').value = '';
+  // 渲染随机路径的领域 chips
+  const domains = ['不限','社会治理','乡村振兴','经济发展','民生保障','生态文明','法治建设','青年成长','科技创新','文化建设'];
+  document.getElementById('exp-domain-chips').innerHTML = domains.map((d,i) =>
+    `<button class="exp-domain-chip${i===0?' active':''}" onclick="expSetDomain('${d==='不限'?'':d}',this)">${d}</button>`
+  ).join('');
+  // 重置难度
+  document.querySelectorAll('#exp-diff-chips .exp-diff-chip').forEach(b => b.classList.remove('active'));
+  const firstDiff = document.querySelector('#exp-diff-chips .exp-diff-chip');
+  if (firstDiff) firstDiff.classList.add('active');
+  _expState.difficulty = 'medium';
+  _expTopicFilter = 'all';
+  show('s-exp-source');
+}
+
+function expSetDomain(domain, btn) {
+  _expState.domain = domain;
+  document.querySelectorAll('#exp-domain-chips .exp-domain-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function expSetDiff(diff, btn) {
+  _expState.difficulty = diff;
+  document.querySelectorAll('#exp-diff-chips .exp-diff-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── 路径 1：从题库选题 ──
+function expFromTopics() {
+  document.getElementById('exp-source-choices').style.display = 'none';
+  document.getElementById('exp-topics-panel').style.display = '';
+  document.getElementById('exp-manual-panel').style.display = 'none';
+  document.getElementById('exp-random-panel').style.display = 'none';
+  _expState.source = 'topic';
+  expRenderTopicList();
+}
+
+function expFilterTopics(filter, btn) {
+  _expTopicFilter = filter;
+  document.querySelectorAll('#exp-topics-panel .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  expRenderTopicList();
+}
+
+function expRenderTopicList() {
+  const interviews = INTERVIEW_TOPICS;
+  const subtypes = _expTopicFilter === 'all'
+    ? ['综合分析','人际关系','计划组织','应急处突','自我认知']
+    : [_expTopicFilter];
+
+  let html = '';
+  subtypes.forEach(sub => {
+    const items = interviews.filter(t => t.subtype === sub);
+    if (!items.length) return;
+    html += `<div class="interview-subtype">${sub}</div>`;
+    items.forEach((t, j) => {
+      const idx = interviews.indexOf(t);
+      html += `<div class="bank-item" onclick="expSelectTopic(${idx})" style="cursor:pointer;">
+        <div class="bank-item-text">${t.text}${t.source ? '<span style="font-size:10px;color:var(--gold);margin-left:4px;">真题</span>' : ''}</div>
+      </div>`;
+    });
+  });
+  document.getElementById('exp-topics-list').innerHTML = html || '<div class="muted" style="text-align:center;padding:20px;">暂无题目</div>';
+}
+
+async function expSelectTopic(idx) {
+  const t = INTERVIEW_TOPICS[idx];
+  _expState.sourceTopic = { text: t.text, subtype: t.subtype };
+  // 显示加载
+  document.getElementById('exp-claims-panel').style.display = '';
+  document.getElementById('exp-claims-loading').style.display = 'flex';
+  document.getElementById('exp-claim-list').innerHTML = '';
+
+  const prompt = `从以下公务员结构化面试题中提取 2-3 个核心论点，每个论点一句话（15-30字），有观点态度，不是事实陈述。不要编号，每行一个论点。
+
+题目（${t.subtype}）：${t.text}`;
+
+  try {
+    const result = await callLLM(prompt, 800);
+    const claims = result.split('\n').map(s => s.replace(/^[\d\.\-\s•*]+/, '').trim()).filter(s => s.length >= 8 && s.length <= 60);
+    if (!claims.length) throw new Error('论点提取结果为空');
+    document.getElementById('exp-claim-list').innerHTML = claims.map((c, i) =>
+      `<div class="exp-claim-item" onclick="expPickClaim('${c.replace(/'/g, "\\'")}', this)">${c}</div>`
+    ).join('');
+  } catch(e) {
+    document.getElementById('exp-claim-list').innerHTML = `<div class="muted" style="color:var(--red);font-size:13px;">提取失败：${e.message}</div>`;
+  } finally {
+    document.getElementById('exp-claims-loading').style.display = 'none';
+  }
+}
+
+async function expPickClaim(claim, btn) {
+  _expState.argument = claim;
+  document.querySelectorAll('#exp-claim-list .exp-claim-item').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  await expGenerateDirections();
+}
+
+// ── 路径 2：手动输入 ──
+function expManual() {
+  document.getElementById('exp-source-choices').style.display = 'none';
+  document.getElementById('exp-topics-panel').style.display = 'none';
+  document.getElementById('exp-manual-panel').style.display = '';
+  document.getElementById('exp-random-panel').style.display = 'none';
+  _expState.source = 'manual';
+  _expState.sourceTopic = null;
+  setTimeout(() => document.getElementById('exp-manual-input').focus(), 100);
+}
+
+async function expManualSubmit() {
+  const input = document.getElementById('exp-manual-input').value.trim();
+  if (!input || input.length < 6) {
+    alert('请输入至少6个字的论点句');
+    return;
+  }
+  _expState.argument = input;
+  await expGenerateDirections();
+}
+
+// ── 路径 3：随机生成 ──
+function expRandom() {
+  document.getElementById('exp-source-choices').style.display = 'none';
+  document.getElementById('exp-topics-panel').style.display = 'none';
+  document.getElementById('exp-manual-panel').style.display = 'none';
+  document.getElementById('exp-random-panel').style.display = '';
+  _expState.source = 'random';
+  _expState.sourceTopic = null;
+}
+
+async function expRandomGenerate() {
+  document.getElementById('exp-random-loading').style.display = 'flex';
+  const domainPart = _expState.domain ? `关于【${_expState.domain}】领域` : '关于公务员结构化面试常见话题';
+  const diffMap = { easy: '简单（观点直白，容易举例）', medium: '中等（有一定抽象度，需稍加思考）', hard: '困难（需多维度深入展开）' };
+  const diffPart = diffMap[_expState.difficulty] || diffMap.medium;
+
+  const prompt = `生成一个${domainPart}的论点句，难度${diffPart}，作为口才展开训练素材。
+
+要求：
+- 论点一句话（15-30字），有观点态度，适合展开论述
+- 同时提供 3 条展开方向提示，每条 10-15 字，覆盖不同角度
+
+输出格式（严格按此，不要任何多余文字）：
+论点：xxx
+→ xxx
+→ xxx
+→ xxx`;
+
+  try {
+    const result = await callLLM(prompt, 800);
+    const argM = result.match(/论点[：:]\s*(.+)/);
+    const dirs = [...result.matchAll(/→\s*(.+)/g)].map(m => m[1].trim());
+    _expState.argument = argM?.[1]?.trim() || '';
+    _expState.directions = dirs.slice(0, 3);
+    if (!_expState.argument) throw new Error('论点生成失败');
+    if (!_expState.directions.length) _expState.directions = ['分析原因和背景', '举一个具体案例', '提出对策和建议'];
+    expShowReady();
+  } catch(e) {
+    alert('生成失败：' + e.message);
+  } finally {
+    document.getElementById('exp-random-loading').style.display = 'none';
+  }
+}
+
+// ── 展开方向生成 ──
+async function expGenerateDirections() {
+  document.getElementById('exp-source-loading').style.display = 'flex';
+  const topicCtx = _expState.sourceTopic
+    ? `原题（${_expState.sourceTopic.subtype}）：${_expState.sourceTopic.text}\n`
+    : '';
+
+  const prompt = `以下是面试题和选定的论点，请生成 3 条展开方向提示，每条 10-15 字，覆盖不同角度（如原因分析、案例举例、对策建议、意义升华等）。不要编号，每行以"→"开头。
+
+${topicCtx}论点：${_expState.argument}`;
+
+  try {
+    const result = await callLLM(prompt, 600);
+    const dirs = [...result.matchAll(/→\s*(.+)/g)].map(m => m[1].trim());
+    _expState.directions = dirs.slice(0, 3);
+    if (!_expState.directions.length) {
+      _expState.directions = ['阐述这句话的核心含义', '结合实际举例说明', '从这个角度提出对策'];
+    }
+    expShowReady();
+  } catch(e) {
+    // 降级：使用默认方向
+    _expState.directions = ['阐述这句话的核心含义', '结合实际举例说明', '从这个角度提出对策'];
+    expShowReady();
+  } finally {
+    document.getElementById('exp-source-loading').style.display = 'none';
+  }
+}
+
+// ── 准备页 ──
+function expShowReady() {
+  document.getElementById('exp-arg-text').textContent = _expState.argument;
+  document.getElementById('exp-dirs').innerHTML = _expState.directions.map(d =>
+    `<div class="exp-dir-item">${d}</div>`
+  ).join('');
+  const srcLabel = _expState.source === 'topic' ? `来源：${_expState.sourceTopic?.subtype || ''} · ${(_expState.sourceTopic?.text || '').slice(0, 30)}…`
+    : _expState.source === 'manual' ? '来源：手动输入'
+    : '来源：随机生成';
+  document.getElementById('exp-ready-source').textContent = srcLabel;
+  // 重置时长按钮
+  document.querySelectorAll('#exp-dur-options .exp-dur-btn').forEach(b => b.classList.remove('active'));
+  const durBtn = document.querySelector(`#exp-dur-options .exp-dur-btn[onclick*="${_expState.duration}"]`);
+  if (durBtn) durBtn.classList.add('active');
+  show('s-exp-ready');
+}
+
+function expSetDur(sec, btn) {
+  _expState.duration = sec;
+  document.querySelectorAll('#exp-dur-options .exp-dur-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function expBackToSource() {
+  goExpSource();
+}
+
+async function expReroll() {
+  if (_expState.source === 'topic' && _expState.sourceTopic) {
+    // 回到选题重新提取
+    document.getElementById('exp-source-choices').style.display = 'none';
+    document.getElementById('exp-topics-panel').style.display = '';
+    document.getElementById('exp-claims-panel').style.display = '';
+    document.getElementById('exp-claim-list').innerHTML = '';
+    const idx = INTERVIEW_TOPICS.findIndex(t => t.text === _expState.sourceTopic.text && t.subtype === _expState.sourceTopic.subtype);
+    if (idx >= 0) expSelectTopic(idx);
+    else goExpSource();
+  } else if (_expState.source === 'random') {
+    await expRandomGenerate();
+  } else {
+    goExpSource();
+  }
+}
+
+// ── 论点展开倒计时 ──
+function expStartCountdown() {
+  cancelPrepTimer();
+  // 请求麦克风权限
+  if (navigator.mediaDevices && !S._permStream) {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      S._permStream = stream;
+      S._permError = null;
+    }).catch(err => {
+      S._permStream = null;
+      S._permError = err;
+    });
+  }
+  show('s-countdown');
+  let n = 3;
+  const tips = ['记住论点，想好第一句', '按展开方向组织思路', '开口！'];
+  document.getElementById('cdnum').textContent = n;
+  document.getElementById('cd-tip').textContent = tips[0];
+  const iv = setInterval(() => {
+    n--;
+    if (n <= 0) { clearInterval(iv); expBeginRecording(); return; }
+    document.getElementById('cdnum').textContent = n;
+    document.getElementById('cdnum').style.animation = 'none';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.getElementById('cdnum').style.animation = 'pop .7s ease-out';
+    }));
+    document.getElementById('cd-tip').textContent = tips[3 - n] || '';
+  }, 900);
+}
+
+// ── 论点展开录音 ──
+function expBeginRecording() {
+  S.transcript = '';
+  S.isRecording = true;
+  S.startTime = Date.now();
+  S.sessionId = Date.now().toString();
+  document.getElementById('tx-text').textContent = '开始说话后，文字会自动出现……';
+  document.getElementById('tx-text').style.color = 'var(--muted)';
+  document.getElementById('no-sr-hint').style.display = 'none';
+  document.getElementById('exp-rec-bar').style.display = 'block';
+  document.getElementById('exp-rec-arg').textContent = _expState.argument;
+  document.getElementById('exp-rec-dir').textContent = _expState.directions.join(' · ');
+  const durSec = _expState.duration;
+  document.getElementById('rec-target-hint').textContent = `目标 ${durSec} 秒`;
+  show('s-rec');
+
+  S.timerRef = setInterval(() => {
+    const sec = Math.floor((Date.now() - S.startTime) / 1000);
+    document.getElementById('timer').textContent = `${Math.floor(sec/60)}:${pad(sec%60)}`;
+    // 到达目标时长时计时器变红提醒
+    if (sec >= durSec) {
+      document.getElementById('timer').style.color = 'var(--red)';
+    }
+  }, 500);
+
+  if (S.asrType !== 'api') {
+    startSR();
+  } else {
+    document.getElementById('tx-text').textContent = '🎙 录音中（API 模式将在结束后转写）';
+    document.getElementById('tx-text').style.color = 'var(--muted)';
+  }
+  startMediaRecorder();
+}
+
 /* ═══════════════════════════════════════
    PREP TIMER (准备倒计时)
 ═══════════════════════════════════════ */
