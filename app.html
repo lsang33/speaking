@@ -478,7 +478,123 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="flex gap-8">
       <button class="btn btn-ghost" onclick="goWordReady()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">词语串联</button>
       <button class="btn btn-ghost" onclick="goStorySetup()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">讲述模式</button>
+      <button class="btn btn-ghost" onclick="goExpSource()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">论点展开</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══ EXPANSION SOURCE ═══ -->
+<div id="s-exp-source" class="screen flex col gap-18">
+  <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
+
+  <div>
+    <div class="label">论点展开</div>
+    <p class="muted" style="margin-top:6px; font-size:13px;">获得一个观点句，练习将其展开成完整论述</p>
+  </div>
+
+  <!-- 路径选择 -->
+  <div class="flex col gap-10" id="exp-source-choices">
+    <div class="exp-source-card" onclick="expFromTopics()">
+      <div class="exp-source-icon">📋</div>
+      <div style="font-weight:600; font-size:16px;">从题库选题提取</div>
+      <div class="muted" style="font-size:12px; margin-top:4px;">选一道真题，AI提取其中的核心论点</div>
+    </div>
+    <div class="exp-source-card" onclick="expManual()">
+      <div class="exp-source-icon">✏️</div>
+      <div style="font-weight:600; font-size:16px;">手动输入论点</div>
+      <div class="muted" style="font-size:12px; margin-top:4px;">自己写一句观点，AI帮你分析展开方向</div>
+    </div>
+    <div class="exp-source-card" onclick="expRandom()">
+      <div class="exp-source-icon">🎲</div>
+      <div style="font-weight:600; font-size:16px;">随机生成论点</div>
+      <div class="muted" style="font-size:12px; margin-top:4px;">AI随机出题，可选限定领域和难度</div>
+    </div>
+  </div>
+
+  <!-- 路径1展开：题库选择 -->
+  <div id="exp-topics-panel" style="display:none;" class="flex col gap-12">
+    <div class="label">选题</div>
+    <div class="filter-bar" style="flex-wrap:wrap; gap:6px;">
+      <button class="filter-btn active" onclick="expFilterTopics('all',this)">全部</button>
+      <button class="filter-btn" onclick="expFilterTopics('综合分析',this)">综合分析</button>
+      <button class="filter-btn" onclick="expFilterTopics('人际关系',this)">人际关系</button>
+      <button class="filter-btn" onclick="expFilterTopics('计划组织',this)">计划组织</button>
+      <button class="filter-btn" onclick="expFilterTopics('应急处突',this)">应急处突</button>
+      <button class="filter-btn" onclick="expFilterTopics('自我认知',this)">自我认知</button>
+    </div>
+    <div id="exp-topics-list" style="max-height:40vh; overflow-y:auto;"></div>
+    <div id="exp-claims-panel" style="display:none;" class="flex col gap-8">
+      <div class="label">AI 提取的论点</div>
+      <div class="exp-loading" id="exp-claims-loading" style="display:none;">
+        <div class="spin" style="width:18px;height:18px;"></div> AI正在提取论点…
+      </div>
+      <div id="exp-claim-list"></div>
+    </div>
+  </div>
+
+  <!-- 路径2展开：手动输入 -->
+  <div id="exp-manual-panel" style="display:none;" class="flex col gap-10">
+    <div class="label">输入你的论点句</div>
+    <input type="text" id="exp-manual-input" placeholder="例如：基层治理需要数字化赋能" maxlength="60" autocomplete="off"/>
+    <button class="btn btn-gold" onclick="expManualSubmit()" style="font-size:15px;">确认，生成展开方向</button>
+  </div>
+
+  <!-- 路径3展开：随机生成 -->
+  <div id="exp-random-panel" style="display:none;" class="flex col gap-12">
+    <div>
+      <div class="label" style="margin-bottom:8px;">领域（可选）</div>
+      <div class="flex gap-6" style="flex-wrap:wrap;" id="exp-domain-chips">
+        <!-- JS 动态填充 -->
+      </div>
+    </div>
+    <div>
+      <div class="label" style="margin-bottom:8px;">难度（可选）</div>
+      <div class="flex gap-6" id="exp-diff-chips">
+        <button class="exp-diff-chip active" onclick="expSetDiff('medium',this)">中等</button>
+        <button class="exp-diff-chip" onclick="expSetDiff('easy',this)">简单</button>
+        <button class="exp-diff-chip" onclick="expSetDiff('hard',this)">困难</button>
+      </div>
+    </div>
+    <button class="btn btn-gold" onclick="expRandomGenerate()" style="font-size:15px;">🎲 生成论点</button>
+    <div class="exp-loading" id="exp-random-loading" style="display:none;">
+      <div class="spin" style="width:18px;height:18px;"></div> AI正在生成论点…
+    </div>
+  </div>
+
+  <!-- 加载状态 -->
+  <div class="exp-loading" id="exp-source-loading" style="display:none; justify-content:center;">
+    <div class="spin" style="width:22px;height:22px;"></div> 加载中…
+  </div>
+</div>
+
+<!-- ═══ EXPANSION READY ═══ -->
+<div id="s-exp-ready" class="screen flex col gap-18">
+  <button onclick="expBackToSource()" class="btn btn-ghost btn-sm">← 返回</button>
+
+  <div>
+    <div class="label">论点展开</div>
+    <div class="muted" id="exp-ready-source" style="font-size:11px; margin-top:4px;"></div>
+  </div>
+
+  <div id="exp-arg-text"></div>
+
+  <div>
+    <div class="label" style="margin-bottom:10px;">展开方向</div>
+    <div id="exp-dirs"></div>
+  </div>
+
+  <div>
+    <div class="label" style="margin-bottom:10px;">目标时长</div>
+    <div id="exp-dur-options">
+      <button class="exp-dur-btn" onclick="expSetDur(60,this)">60s</button>
+      <button class="exp-dur-btn active" onclick="expSetDur(90,this)">90s</button>
+      <button class="exp-dur-btn" onclick="expSetDur(120,this)">120s</button>
+    </div>
+  </div>
+
+  <div class="mt-auto flex col gap-10">
+    <button class="btn btn-gold" onclick="expStartCountdown()">开始练习</button>
+    <button class="btn btn-ghost" id="exp-reroll-btn" onclick="expReroll()" style="font-size:14px;">换个论点</button>
   </div>
 </div>
 
@@ -642,6 +758,12 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="word-chips-row" id="rec-word-chips" style="justify-content:flex-start; gap:8px;"></div>
   </div>
 
+  <!-- 论点展开模式：论点+方向提示 -->
+  <div id="exp-rec-bar">
+    <div class="exp-rec-arg" id="exp-rec-arg"></div>
+    <div class="exp-rec-dir" id="exp-rec-dir"></div>
+  </div>
+
   <div>
     <div class="muted" style="font-size:12px; margin-bottom:6px;">实时转写（AI 评估用）</div>
     <div id="tx-box">
@@ -684,6 +806,12 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
 
   <div id="res-score-reason" style="display:none;"></div>
+
+  <!-- 论点展开：词汇升级 + 展开对比 -->
+  <div id="exp-result-section" style="display:none;">
+    <div id="exp-vocab-upgrade" class="card" style="margin-bottom:10px;"></div>
+    <div id="exp-compare" class="card"></div>
+  </div>
 
   <div class="topic-card" style="padding:14px 18px;" id="res-topic-display"></div>
 
