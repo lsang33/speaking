@@ -3511,9 +3511,10 @@ async function expSelectTopic(idx) {
     const result = await callLLM(prompt, 800);
     const claims = result.split('\n').map(s => s.replace(/^[\d\.\-\s•*]+/, '').trim()).filter(s => s.length >= 8 && s.length <= 60);
     if (!claims.length) throw new Error('论点提取结果为空');
-    document.getElementById('exp-claim-list').innerHTML = claims.map((c, i) =>
-      `<div class="exp-claim-item" onclick="expPickClaim('${c.replace(/'/g, "\\'")}', this)">${c}</div>`
-    ).join('');
+    document.getElementById('exp-claim-list').innerHTML = claims.map((c, i) => {
+      const escaped = c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return `<div class="exp-claim-item" data-claim="${escaped.replace(/'/g,'&#39;')}" onclick="expPickClaim(this.dataset.claim, this)">${escaped}</div>`;
+    }).join('');
   } catch(e) {
     document.getElementById('exp-claim-list').innerHTML = `<div class="muted" style="color:var(--red);font-size:13px;">提取失败：${e.message}</div>`;
   } finally {
@@ -3677,6 +3678,8 @@ function expStartCountdown() {
       S._permStream = null;
       S._permError = err;
     });
+  } else if (!navigator.mediaDevices) {
+    S._permError = { name: 'NoMediaDevices', message: '此环境不支持 mediaDevices（通常是非 HTTPS 或浏览器太旧）' };
   }
   show('s-countdown');
   let n = 3;
