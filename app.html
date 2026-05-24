@@ -2329,6 +2329,19 @@ function retryHistSession(id) {
   const h = allSessions.find(s => s.id === id);
   if (!h) return;
   S.mode = h.mode || 'topic';
+  if (h.mode === 'expansion') {
+    _expState = {
+      source: h.expSource || 'manual',
+      sourceTopic: h.expSourceTopic ? { text: h.expSourceTopic, subtype: h.theme || '' } : null,
+      argument: h.expArgument || h.topic,
+      directions: h.expDirections || ['阐述核心含义', '结合实际举例', '提出对策建议'],
+      duration: 90,
+      domain: '',
+      difficulty: 'medium',
+    };
+    expShowReady();
+    return;
+  }
   if (h.mode === 'word') {
     S.words = h.words || [];
     S.wordCount = h.words ? h.words.length : S.wordCount;
@@ -2346,6 +2359,7 @@ function goHome() {
   cancelPrepTimer();
   S.mode = 'topic';
   S.words = [];
+  _expState = { source: '', sourceTopic: null, argument: '', directions: [], duration: 90, domain: '', difficulty: 'medium' };
   computeStreak();
   const now = new Date();
   const days = ['日','一','二','三','四','五','六'];
@@ -2757,7 +2771,8 @@ function renderHistList(sessions) {
               const hit = h.transcript && h.transcript.includes(w);
               return `<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:12px;font-size:12px;font-weight:600;border:1px solid ${hit?'var(--green)':'#444'};background:${hit?'rgba(76,175,110,.12)':'var(--card2)'};color:${hit?'var(--green)':'var(--muted)'};">${hit?'✓ ':''}${w}</span>`;
             }).join('')}
-          </div>` : `<div style="font-size:14px;font-weight:500;line-height:1.4;">${h.topic || ''}</div>`}
+          </div>` : h.mode === 'expansion' ? `<div style="font-size:14px;font-weight:500;line-height:1.4;color:var(--gold);">${h.topic || ''}</div>`
+            : `<div style="font-size:14px;font-weight:500;line-height:1.4;">${h.topic || ''}</div>`}
         </div>
         <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;margin-left:10px;">
           <div style="font-size:22px;font-weight:700;color:var(--gold);line-height:1;">${h.score || '—'}</div>
@@ -4006,6 +4021,7 @@ function beginRecording() {
   document.getElementById('tx-text').textContent = '开始说话后，文字会自动出现……';
   document.getElementById('tx-text').style.color = 'var(--muted)';
   document.getElementById('no-sr-hint').style.display = 'none';
+  document.getElementById('exp-rec-bar').style.display = 'none';
   renderRecWordChips();
   const durLabel = S.mode === 'story' ? '3-5 分钟' : (S.targetDur === '1-2' ? '1-2 分钟' : S.targetDur === '3-4' ? '3-4 分钟' : S.targetDur === '4-5' ? '4-5 分钟' : '2-3 分钟');
   document.getElementById('rec-target-hint').textContent = `目标 ${durLabel}`;
@@ -4299,7 +4315,48 @@ async function evaluate() {
     : '';
 
   let prompt;
-  if (mode === 'word') {
+  if (mode === 'expansion') {
+    const durTarget = _expState.duration;
+    const durNote = duration < durTarget * 0.6 ? '⚠️严重偏短' : duration < durTarget * 0.85 ? '略短' : duration > durTarget * 1.5 ? '明显超时' : duration > durTarget * 1.2 ? '略长' : '✓达标';
+
+    prompt = `你是口才训练教练，正在评估学员的「论点展开」专项训练。${asrAccurateNote}
+
+【论点】「${_expState.argument}」
+
+【参考展开方向】
+${_expState.directions.map((d,i) => `${i+1}. ${d}`).join('\n')}
+
+【客观数据——评分必须与之一致】
+- 发言时长：${dur}（${durNote}，目标 ${durTarget} 秒）
+- 有效字数：${tm.chars} 字
+- 语速：${tm.pace} 字/分钟（${paceNote}，正常范围 200-270）
+- 口头禅次数：${tm.totalFillers} 次（${fillerDetail}）
+- 重复词次数：${tm.totalRepeats} 次（${repeatDetail}）
+${audioSection}
+
+${transcriptLabel}
+「${transcript || '（未能获取转写内容）'}」
+
+【评分标准——聚焦展开能力，严格参照，不得虚高】
+9-10分：多角度展开，每个角度深入有料，举例具体，语言流畅有感染力，词汇专业丰富，时长达标
+7-8分：覆盖2个以上角度，论证较充分，有具体举例，词汇较丰富，口头禅≤2次
+5-6分：仅1-2个角度，论证偏浅，举例空洞或不具体，词汇单调，或时长明显偏短
+3-4分：基本只是重复论点本身，没有展开，或逻辑混乱，口头禅≥6次
+1-2分：内容极少或完全偏离论点
+
+【输出格式——严格按此】
+
+**展开诊断**：[综合评估4个维度：展开完整度/词汇丰富度/论证说服力/衔接自然度，每项一两句，标注强弱项]
+
+**词汇升级**：[列出3-5个可升级词汇，每行格式：原文词 → 建议词 | 理由]
+
+**展开示范**：[为同一论点写一段高质量的展开示范，200-300字，有逻辑层次，有具体举例，有专业词汇，让学员可以对比学习]
+
+**评分**：[X/10，整数，必须与客观数据一致]
+**评分理由**：[一句话点明得这个分的最主要原因]
+**鼓励**：[一句话，不超过15字]
+**明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}`;
+  } else if (mode === 'word') {
     // ── 词语串联模式 ──
     const wordList = words.join('、');
     const coveredWords = words.filter(w => transcript.includes(w));
@@ -4458,10 +4515,14 @@ ${transcriptLabel}
       id: S.sessionId,
       date: today(),
       mode: mode || 'topic',
-      topic: mode === 'word' ? `词语串联：${words.join('、')}`
+      topic: mode === 'expansion' ? _expState.argument
+           : mode === 'word' ? `词语串联：${words.join('、')}`
            : mode === 'story' ? (S.storyTitle || `${({movie:'电影',book:'书籍',experience:'亲身经历',news:'新闻事件'}[S.storyCategory]||'故事')}`)
            : topic.text,
-      theme: mode === 'word' ? '词语串联' : mode === 'story' ? '讲述模式' : topic.theme,
+      theme: mode === 'expansion' ? '论点展开'
+           : mode === 'word' ? '词语串联'
+           : mode === 'story' ? '讲述模式'
+           : topic.theme,
       words: mode === 'word' ? words : undefined,
       storyTitle: mode === 'story' ? S.storyTitle : undefined,
       storyCategory: mode === 'story' ? S.storyCategory : undefined,
@@ -4475,6 +4536,11 @@ ${transcriptLabel}
       highScore: '',
       metrics: analyzeTranscript(S.transcript, duration),
       audioMetrics: S.audioMetrics,
+      // expansion 特有字段
+      expArgument: mode === 'expansion' ? _expState.argument : undefined,
+      expDirections: mode === 'expansion' ? _expState.directions : undefined,
+      expSource: mode === 'expansion' ? _expState.source : undefined,
+      expSourceTopic: mode === 'expansion' ? (_expState.sourceTopic?.text || '') : undefined,
     };
     await saveSession(session);
     allSessions.unshift(session);
@@ -4482,16 +4548,23 @@ ${transcriptLabel}
     showResult(session, evalText);
 
     // 后台并行：优化版本 + 高分示范
-    if (S.enableOptimize) generateOptimized(session);
-    if (S.enableHighScore) generateHighScore(session);
+    if (S.enableOptimize && mode !== 'expansion') generateOptimized(session);
+    if (S.enableHighScore && mode !== 'expansion') generateHighScore(session);
   } catch (err) {
     S.debugLastResponse = `[错误] ${err.message}`;
     const fallbackSession = {
       id: S.sessionId, date: today(), mode: mode || 'topic',
-      topic: mode === 'word' ? `词语串联：${words.join('、')}` : mode === 'story' ? (S.storyTitle || '讲述模式') : topic.text,
-      theme: mode === 'word' ? '词语串联' : mode === 'story' ? '讲述模式' : topic.theme,
+      topic: mode === 'expansion' ? _expState.argument
+           : mode === 'word' ? `词语串联：${words.join('、')}` : mode === 'story' ? (S.storyTitle || '讲述模式') : topic.text,
+      theme: mode === 'expansion' ? '论点展开'
+           : mode === 'word' ? '词语串联' : mode === 'story' ? '讲述模式' : topic.theme,
       asrType: S.asrType || 'browser', duration, transcript: S.transcript,
       evaluation: '', score: '—', metrics: analyzeTranscript(S.transcript, duration), audioMetrics: S.audioMetrics,
+      // expansion 特有字段
+      expArgument: mode === 'expansion' ? _expState.argument : undefined,
+      expDirections: mode === 'expansion' ? _expState.directions : undefined,
+      expSource: mode === 'expansion' ? _expState.source : undefined,
+      expSourceTopic: mode === 'expansion' ? (_expState.sourceTopic?.text || '') : undefined,
     };
     await saveSession(fallbackSession);
     allSessions.unshift(fallbackSession);
@@ -4734,7 +4807,13 @@ function showResult(session, evalText) {
   document.getElementById('res-metrics').innerHTML = '';
 
   const slipSect = session.asrType === 'api' ? [{ k: '口误标记', icon: '🔍' }] : [];
-  const sects = session.mode === 'story'
+  const sects = session.mode === 'expansion'
+    ? [
+      { k: '展开诊断', icon: '📊' },
+      { k: '明日聚焦', icon: '🎯' },
+      ...slipSect,
+    ]
+    : session.mode === 'story'
     ? [
       { k: '叙事结构', icon: '📖' },
       { k: '细节生动性', icon: '🎨' },
@@ -4827,6 +4906,47 @@ function showResult(session, evalText) {
 
   const cont = document.getElementById('res-evals');
   cont.innerHTML = sectHtml ? `<div class="eval-merged">${sectHtml}</div>` : '';
+
+  // 论点展开：词汇升级 + 展开对比
+  const expSection = document.getElementById('exp-result-section');
+  const vocabDiv = document.getElementById('exp-vocab-upgrade');
+  const compareDiv = document.getElementById('exp-compare');
+  if (session.mode === 'expansion' && evalText) {
+    expSection.style.display = '';
+
+    // 词汇升级
+    const vocabM = evalText.match(/\*\*词汇升级\*\*[：:]([\s\S]*?)(?=\*\*展开示范\*\*|\*\*评分\*\*|$)/);
+    if (vocabM) {
+      const lines = vocabM[1].trim().split('\n').filter(l => l.includes('→'));
+      vocabDiv.innerHTML = `
+        <div class="label" style="margin-bottom:8px;">📝 词汇升级</div>
+        ${lines.map(l => {
+          const parts = l.split('|').map(s => s.trim());
+          const mainParts = (parts[0] || l).split('→').map(s => s.trim());
+          return `<div class="vu-row">
+            <span class="vu-from">${mainParts[0] || ''}</span>
+            <span class="vu-arrow">→</span>
+            <span class="vu-to">${mainParts[1] || ''}</span>
+            ${parts[1] ? `<span class="vu-reason">${parts[1]}</span>` : ''}
+          </div>`;
+        }).join('')}
+      `;
+    } else {
+      vocabDiv.innerHTML = '';
+    }
+
+    // 展开对比
+    const demoM = evalText.match(/\*\*展开示范\*\*[：:]([\s\S]*?)(?=\*\*评分\*\*|$)/);
+    compareDiv.innerHTML = `
+      <div class="label" style="margin-bottom:8px;">📖 展开对比</div>
+      <div class="muted" style="font-size:11px;margin-bottom:6px;">你的回答</div>
+      <div class="exp-original">${session.transcript || '（无转写内容）'}</div>
+      <div class="muted" style="font-size:11px;margin:10px 0 6px;">AI 展开示范</div>
+      <div class="exp-model">${demoM ? demoM[1].trim().replace(/\n/g, '<br>') : '（示范未生成）'}</div>
+    `;
+  } else {
+    expSection.style.display = 'none';
+  }
 
   const cm = evalText.match(/\*\*鼓励\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   document.getElementById('res-cheer').textContent = cm ? cm[1].trim() : '继续坚持，每天进步一点点。';
