@@ -2765,14 +2765,13 @@ function renderHistList(sessions) {
             <span class="theme-badge">${h.theme || '—'}</span>
             <span style="font-size:11px;color:var(--muted);">${h.date} · ${mins}分${pad(secs)}秒</span>
           </div>
-          ${h.words && h.words.length ? `
+          ${h.mode === 'expansion' ? `<div style="font-size:14px;font-weight:500;line-height:1.4;color:var(--gold);">${h.topic || ''}</div>` : h.words && h.words.length ? `
           <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px;">
             ${h.words.map(w => {
               const hit = h.transcript && h.transcript.includes(w);
               return `<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:12px;font-size:12px;font-weight:600;border:1px solid ${hit?'var(--green)':'#444'};background:${hit?'rgba(76,175,110,.12)':'var(--card2)'};color:${hit?'var(--green)':'var(--muted)'};">${hit?'✓ ':''}${w}</span>`;
             }).join('')}
-          </div>` : h.mode === 'expansion' ? `<div style="font-size:14px;font-weight:500;line-height:1.4;color:var(--gold);">${h.topic || ''}</div>`
-            : `<div style="font-size:14px;font-weight:500;line-height:1.4;">${h.topic || ''}</div>`}
+          </div>` : `<div style="font-size:14px;font-weight:500;line-height:1.4;">${h.topic || ''}</div>`}
         </div>
         <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;margin-left:10px;">
           <div style="font-size:22px;font-weight:700;color:var(--gold);line-height:1;">${h.score || '—'}</div>
@@ -4021,7 +4020,7 @@ function beginRecording() {
   document.getElementById('tx-text').textContent = '开始说话后，文字会自动出现……';
   document.getElementById('tx-text').style.color = 'var(--muted)';
   document.getElementById('no-sr-hint').style.display = 'none';
-  document.getElementById('exp-rec-bar').style.display = 'none';
+  if (S.mode !== 'expansion') document.getElementById('exp-rec-bar').style.display = 'none';
   renderRecWordChips();
   const durLabel = S.mode === 'story' ? '3-5 分钟' : (S.targetDur === '1-2' ? '1-2 分钟' : S.targetDur === '3-4' ? '3-4 分钟' : S.targetDur === '4-5' ? '4-5 分钟' : '2-3 分钟');
   document.getElementById('rec-target-hint').textContent = `目标 ${durLabel}`;
