@@ -292,6 +292,15 @@ input:focus { outline: none; border-color: var(--gold); }
   background: var(--card2); color: var(--muted); font-size: 12px; cursor: pointer;
 }
 .exp-domain-chip.active, .exp-diff-chip.active { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 600; }
+.exp-theme-chip {
+  display: block; width: 100%; padding: 14px 16px; border-radius: 10px;
+  border: 1.5px solid #333; background: var(--card2); color: var(--text);
+  font-size: 15px; font-weight: 500; cursor: pointer; text-align: left;
+  transition: all .15s;
+}
+.exp-theme-chip .theme-chip-sub { font-size: 12px; color: var(--muted); font-weight: 400; }
+.exp-theme-chip:active { opacity: .7; }
+.exp-theme-chip.active { border-color: var(--gold); background: rgba(212,168,67,.08); }
 #exp-claim-list { display: flex; flex-direction: column; gap: 8px; }
 .exp-claim-item {
   padding: 14px; background: var(--card2); border-radius: 10px; cursor: pointer;
@@ -591,9 +600,13 @@ input:focus { outline: none; border-color: var(--gold); }
         <!-- JS 动态填充 -->
       </div>
     </div>
-    <div id="exp-theme-info" style="display:none;" class="card flex col gap-8">
-      <div class="label" id="exp-theme-kw-label"></div>
-      <div class="muted" id="exp-theme-examples" style="font-size:12px; line-height:1.6;"></div>
+    <div id="exp-theme-info" style="display:none;" class="card flex col gap-10">
+      <div>
+        <div class="label" id="exp-theme-kw-label" style="margin-bottom:8px;"></div>
+        <div id="exp-theme-examples" style="font-size:13px; line-height:1.7;"></div>
+      </div>
+      <button class="btn btn-gold" id="exp-theme-gen-btn" onclick="expThemeGenerate()" style="font-size:15px;">生成可迁移论点</button>
+      <div id="exp-theme-cached-hint" class="muted" style="display:none; font-size:12px; text-align:center;">该主题已有缓存论点，点生成将重新生成</div>
     </div>
     <div class="exp-loading" id="exp-theme-loading" style="display:none;">
       <div class="spin" style="width:18px;height:18px;"></div> AI正在生成可迁移论点…
@@ -3775,10 +3788,7 @@ async function expReroll() {
   } else if (_expState.source === 'random') {
     await expRandomGenerate();
   } else if (_expState.source === 'theme' && _expState.domain) {
-    document.getElementById('exp-source-choices').style.display = 'none';
-    document.getElementById('exp-theme-panel').style.display = '';
-    document.getElementById('exp-theme-info').style.display = '';
-    await expSelectTheme(_expState.domain);
+    await expThemeGenerate(true);
   } else {
     goExpSource();
   }
@@ -3809,44 +3819,55 @@ function expFromTheme() {
   _expState.source = 'theme';
   _expState.sourceTopic = null;
   document.getElementById('exp-theme-info').style.display = 'none';
+  _expState.domain = '';
   // 渲染 theme chips
   document.getElementById('exp-theme-chips').innerHTML = EXP_THEMES.map(t =>
-    `<button class="exp-domain-chip" onclick="expSelectTheme('${t.id}')">${t.id.split('·')[0]}<span style="font-size:10px;opacity:.6;margin-left:3px;">${t.id.split('·')[1]||''}</span></button>`
+    `<button class="exp-theme-chip" onclick="expSelectTheme('${t.id}', this)"><span>${t.id.split('·')[0]}</span><span class="theme-chip-sub"> · ${t.id.split('·')[1]||''}</span></button>`
   ).join('');
 }
 
-async function expSelectTheme(themeId) {
+function expSelectTheme(themeId, btn) {
   const theme = EXP_THEMES.find(t => t.id === themeId);
   if (!theme) return;
   _expState.domain = themeId;
 
   // 高亮选中
-  document.querySelectorAll('#exp-theme-chips .exp-domain-chip').forEach(b => b.classList.remove('active'));
-  const chips = document.querySelectorAll('#exp-theme-chips .exp-domain-chip');
-  const idx = EXP_THEMES.findIndex(t => t.id === themeId);
-  if (chips[idx]) chips[idx].classList.add('active');
+  document.querySelectorAll('#exp-theme-chips .exp-theme-chip').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
 
-  // 显示关键词 + 示例题目
+  // 显示关键词 + 示例题目（完整文本，不截断）
   const examples = INTERVIEW_TOPICS.filter(t => t.theme === themeId);
   const exampleHtml = examples.slice(0, 3).map(t =>
-    `<div style="margin-bottom:4px;">· ${t.text.slice(0, 45)}${t.text.length > 45 ? '…' : ''}${t.source ? ' <span class="exp-source-badge">真题</span>' : ''}</div>`
+    `<div style="margin-bottom:6px;">· ${t.text}${t.source ? ' <span class="exp-source-badge">真题</span>' : ''}</div>`
   ).join('');
   document.getElementById('exp-theme-kw-label').textContent = '关键词：' + theme.kw;
   document.getElementById('exp-theme-examples').innerHTML = `
-    <div style="margin-bottom:6px;color:var(--text);">示例题目（${examples.length}道）：</div>
+    <div style="margin-bottom:8px;color:var(--text);font-weight:600;">示例题目（${examples.length}道）：</div>
     ${exampleHtml || '<div class="muted">暂无示例题目</div>'}
   `;
   document.getElementById('exp-theme-info').style.display = '';
 
-  // 有缓存直接显示
-  if (_expThemeCache[themeId]) {
+  // 显示缓存状态
+  document.getElementById('exp-theme-cached-hint').style.display = _expThemeCache[themeId] ? '' : 'none';
+  document.getElementById('exp-theme-gen-btn').textContent = _expThemeCache[themeId] ? '重新生成论点' : '生成可迁移论点';
+}
+
+async function expThemeGenerate(forceRefresh = false) {
+  const themeId = _expState.domain;
+  if (!themeId) return;
+  const theme = EXP_THEMES.find(t => t.id === themeId);
+  if (!theme) return;
+
+  // 有缓存且非强制刷新
+  if (!forceRefresh && _expThemeCache[themeId]) {
     _expState.argument = _expThemeCache[themeId].argument;
     _expState.directions = _expThemeCache[themeId].directions;
     expShowReady();
     return;
   }
 
-  // AI 生成可迁移论点
+  // AI 生成
+  document.getElementById('exp-theme-gen-btn').style.display = 'none';
   document.getElementById('exp-theme-loading').style.display = 'flex';
   const kwList = theme.kw.split(' ').join('、');
   const prompt = `你是一位公务员结构化面试培训专家。学员正在练习"${themeId}"类问题的答题框架。
@@ -3879,6 +3900,7 @@ async function expSelectTheme(themeId) {
     alert('生成失败：' + e.message);
   } finally {
     document.getElementById('exp-theme-loading').style.display = 'none';
+    document.getElementById('exp-theme-gen-btn').style.display = '';
   }
 }
 
