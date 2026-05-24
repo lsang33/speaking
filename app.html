@@ -300,6 +300,14 @@ input:focus { outline: none; border-color: var(--gold); }
 }
 .exp-claim-item:active { opacity: .7; }
 .exp-claim-item.selected { border-color: var(--gold); background: rgba(212,168,67,.08); }
+.exp-source-badge {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  color: var(--gold); background: rgba(212,168,67,.12);
+  padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+  vertical-align: middle;
+}
+#exp-topics-list.collapsed { max-height: 26vh; overflow-y: auto; }
+#exp-claims-panel { margin-top: 4px; border-top: 2px solid rgba(212,168,67,.2); padding-top: 14px; }
 .exp-loading {
   display: flex; align-items: center; gap: 10px; padding: 20px 0;
   color: var(--muted); font-size: 14px;
@@ -522,14 +530,19 @@ input:focus { outline: none; border-color: var(--gold); }
       <button class="filter-btn" onclick="expFilterTopics('应急处突',this)">应急处突</button>
       <button class="filter-btn" onclick="expFilterTopics('自我认知',this)">自我认知</button>
     </div>
-    <div id="exp-topics-list" style="max-height:40vh; overflow-y:auto;"></div>
-    <div id="exp-claims-panel" style="display:none;" class="flex col gap-8">
+    <div id="exp-topics-list"></div>
+  </div>
+
+  <!-- 论点提取结果（独立面板，不属于题库选择） -->
+  <div id="exp-claims-panel" style="display:none;" class="card flex col gap-8">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
       <div class="label">AI 提取的论点</div>
-      <div class="exp-loading" id="exp-claims-loading" style="display:none;">
-        <div class="spin" style="width:18px;height:18px;"></div> AI正在提取论点…
-      </div>
-      <div id="exp-claim-list"></div>
+      <button id="exp-refresh-claims-btn" onclick="expRefreshClaims()" style="display:none; background:none; border:1px solid #444; color:var(--muted); font-size:11px; cursor:pointer; padding:3px 10px; border-radius:6px;">↻ 重新生成</button>
     </div>
+    <div class="exp-loading" id="exp-claims-loading" style="display:none;">
+      <div class="spin" style="width:18px;height:18px;"></div> AI正在提取论点…
+    </div>
+    <div id="exp-claim-list"></div>
   </div>
 
   <!-- 路径2展开：手动输入 -->
@@ -2360,6 +2373,7 @@ function goHome() {
   S.mode = 'topic';
   S.words = [];
   _expState = { source: '', sourceTopic: null, argument: '', directions: [], duration: 90, domain: '', difficulty: 'medium' };
+  _expClaimsCache = {};
   computeStreak();
   const now = new Date();
   const days = ['日','一','二','三','四','五','六'];
@@ -3433,10 +3447,12 @@ let _expState = {
   difficulty: 'medium', // 难度 (仅 random)
 };
 let _expTopicFilter = 'all';
+let _expClaimsCache = {};  // { [topicIdx]: claims[] }  缓存已提取的论点
 
 function goExpSource() {
   S.mode = 'expansion';
   _expState = { source: '', sourceTopic: null, argument: '', directions: [], duration: 90, domain: '', difficulty: 'medium' };
+  _expClaimsCache = {};
   // 重置面板
   document.getElementById('exp-source-choices').style.display = '';
   document.getElementById('exp-topics-panel').style.display = 'none';
@@ -3445,6 +3461,7 @@ function goExpSource() {
   document.getElementById('exp-random-panel').style.display = 'none';
   document.getElementById('exp-claim-list').innerHTML = '';
   document.getElementById('exp-manual-input').value = '';
+  document.getElementById('exp-topics-list').classList.remove('collapsed');
   // 渲染随机路径的领域 chips
   const domains = ['不限','社会治理','乡村振兴','经济发展','民生保障','生态文明','法治建设','青年成长','科技创新','文化建设'];
   document.getElementById('exp-domain-chips').innerHTML = domains.map((d,i) =>
@@ -3485,6 +3502,7 @@ function expFilterTopics(filter, btn) {
   _expTopicFilter = filter;
   document.querySelectorAll('#exp-topics-panel .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  document.getElementById('exp-topics-list').classList.remove('collapsed');
   expRenderTopicList();
 }
 
@@ -3502,18 +3520,35 @@ function expRenderTopicList() {
     items.forEach((t, j) => {
       const idx = interviews.indexOf(t);
       html += `<div class="bank-item" onclick="expSelectTopic(${idx})" style="cursor:pointer;">
-        <div class="bank-item-text">${t.text}${t.source ? '<span style="font-size:10px;color:var(--gold);margin-left:4px;">真题</span>' : ''}</div>
+        <div class="bank-item-text">${t.text}${t.source ? '<span class="exp-source-badge">真题</span>' : ''}</div>
       </div>`;
     });
   });
   document.getElementById('exp-topics-list').innerHTML = html || '<div class="muted" style="text-align:center;padding:20px;">暂无题目</div>';
 }
 
-async function expSelectTopic(idx) {
+async function expSelectTopic(idx, forceRefresh = false) {
   const t = INTERVIEW_TOPICS[idx];
   _expState.sourceTopic = { text: t.text, subtype: t.subtype };
-  // 显示加载
+  // 收起题目列表，为论点腾空间
+  document.getElementById('exp-topics-list').classList.add('collapsed');
+  // 显示论点面板
   document.getElementById('exp-claims-panel').style.display = '';
+  // 有缓存且非强制刷新，直接显示
+  if (!forceRefresh && _expClaimsCache[idx]) {
+    _expClaimsCache._lastIdx = idx;
+    document.getElementById('exp-refresh-claims-btn').style.display = '';
+    document.getElementById('exp-claim-list').innerHTML = _expClaimsCache[idx].map((c, i) => {
+      const escaped = c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return `<div class="exp-claim-item" data-claim="${escaped.replace(/'/g,'&#39;')}" onclick="expPickClaim(this.dataset.claim, this)">${escaped}</div>`;
+    }).join('');
+    return;
+  }
+  _expClaimsCache._lastIdx = idx;
+  // 清除旧缓存（只保留当前题）
+  _expClaimsCache = { _lastIdx: idx };
+  // 显示加载
+  document.getElementById('exp-refresh-claims-btn').style.display = 'none';
   document.getElementById('exp-claims-loading').style.display = 'flex';
   document.getElementById('exp-claim-list').innerHTML = '';
 
@@ -3525,14 +3560,24 @@ async function expSelectTopic(idx) {
     const result = await callLLM(prompt, 800);
     const claims = result.split('\n').map(s => s.replace(/^[\d\.\-\s•*]+/, '').trim()).filter(s => s.length >= 8 && s.length <= 60);
     if (!claims.length) throw new Error('论点提取结果为空');
+    _expClaimsCache[idx] = claims;
     document.getElementById('exp-claim-list').innerHTML = claims.map((c, i) => {
       const escaped = c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
       return `<div class="exp-claim-item" data-claim="${escaped.replace(/'/g,'&#39;')}" onclick="expPickClaim(this.dataset.claim, this)">${escaped}</div>`;
     }).join('');
+    document.getElementById('exp-refresh-claims-btn').style.display = '';
   } catch(e) {
     document.getElementById('exp-claim-list').innerHTML = `<div class="muted" style="color:var(--red);font-size:13px;">提取失败：${e.message}</div>`;
   } finally {
     document.getElementById('exp-claims-loading').style.display = 'none';
+  }
+}
+
+function expRefreshClaims() {
+  const idx = _expClaimsCache._lastIdx;
+  if (idx !== undefined && idx >= 0) {
+    delete _expClaimsCache[idx];
+    expSelectTopic(idx, true);
   }
 }
 
@@ -3670,6 +3715,7 @@ async function expReroll() {
     document.getElementById('exp-topics-panel').style.display = '';
     document.getElementById('exp-claims-panel').style.display = '';
     document.getElementById('exp-claim-list').innerHTML = '';
+    document.getElementById('exp-topics-list').classList.add('collapsed');
     const idx = INTERVIEW_TOPICS.findIndex(t => t.text === _expState.sourceTopic.text && t.subtype === _expState.sourceTopic.subtype);
     if (idx >= 0) expSelectTopic(idx);
     else goExpSource();
