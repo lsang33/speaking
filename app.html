@@ -301,6 +301,14 @@ input:focus { outline: none; border-color: var(--gold); }
 .exp-theme-chip .theme-chip-sub { font-size: 12px; color: var(--muted); font-weight: 400; }
 .exp-theme-chip:active { opacity: .7; }
 .exp-theme-chip.active { border-color: var(--gold); background: rgba(212,168,67,.08); }
+.exp-fixed-arg-item {
+  padding: 12px 14px; background: var(--card2); border-radius: 10px; cursor: pointer;
+  border: 1.5px solid transparent; transition: all .15s;
+}
+.exp-fixed-arg-item:active { opacity: .7; }
+.exp-fixed-arg-item:hover { border-color: #444; }
+.exp-fixed-arg-summary { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.exp-fixed-arg-preview { font-size: 12px; color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 #exp-claim-list { display: flex; flex-direction: column; gap: 8px; }
 .exp-claim-item {
   padding: 14px; background: var(--card2); border-radius: 10px; cursor: pointer;
@@ -605,7 +613,11 @@ input:focus { outline: none; border-color: var(--gold); }
         <div class="label" id="exp-theme-kw-label" style="margin-bottom:8px;"></div>
         <div id="exp-theme-examples" style="font-size:13px; line-height:1.7;"></div>
       </div>
-      <button class="btn btn-gold" id="exp-theme-gen-btn" onclick="expThemeGenerate()" style="font-size:15px;">生成可迁移论点</button>
+      <div id="exp-fixed-args" style="display:none;" class="flex col gap-8">
+        <div class="label" style="margin-bottom:2px;">固定论点</div>
+        <div id="exp-fixed-arg-list"></div>
+      </div>
+      <button class="btn btn-gold" id="exp-theme-gen-btn" onclick="expThemeGenerate()" style="font-size:15px;">AI生成可迁移论点</button>
       <div id="exp-theme-cached-hint" class="muted" style="display:none; font-size:12px; text-align:center;">该主题已有缓存论点，点生成将重新生成</div>
     </div>
     <div class="exp-loading" id="exp-theme-loading" style="display:none;">
@@ -3848,9 +3860,34 @@ function expSelectTheme(themeId, btn) {
   `;
   document.getElementById('exp-theme-info').style.display = '';
 
+  // 显示固定论点
+  const fixedArgs = EXP_ARGUMENTS && EXP_ARGUMENTS[themeId];
+  if (fixedArgs && fixedArgs.length) {
+    document.getElementById('exp-fixed-args').style.display = '';
+    document.getElementById('exp-fixed-arg-list').innerHTML = fixedArgs.map((a, i) =>
+      `<div class="exp-fixed-arg-item" onclick="expPickFixedArg('${themeId}', ${i})">
+        <div class="exp-fixed-arg-summary">${a.summary}</div>
+        <div class="exp-fixed-arg-preview">${a.body.replace(/\n/g, ' ').slice(0, 80)}…</div>
+      </div>`
+    ).join('');
+  } else {
+    document.getElementById('exp-fixed-args').style.display = 'none';
+  }
+
   // 显示缓存状态
   document.getElementById('exp-theme-cached-hint').style.display = _expThemeCache[themeId] ? '' : 'none';
-  document.getElementById('exp-theme-gen-btn').textContent = _expThemeCache[themeId] ? '重新生成论点' : '生成可迁移论点';
+  document.getElementById('exp-theme-gen-btn').textContent = _expThemeCache[themeId] ? '重新生成论点' : 'AI生成可迁移论点';
+}
+
+function expPickFixedArg(themeId, idx) {
+  const args = EXP_ARGUMENTS && EXP_ARGUMENTS[themeId];
+  if (!args || !args[idx]) return;
+  const arg = args[idx];
+  _expState.argument = arg.body;
+  _expState.directions = arg.directions;
+  // 缓存起来
+  _expThemeCache[themeId] = { argument: arg.body, directions: arg.directions };
+  expShowReady();
 }
 
 async function expThemeGenerate(forceRefresh = false) {
