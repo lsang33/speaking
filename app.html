@@ -6011,11 +6011,15 @@ function pickRandom() {
 ═══════════════════════════════════════ */
 let topicsSearch = '';
 let topicsMainTab = 'interview'; // 'interview' | 'free' | 'fav' | 'custom'
-let topicsSubFilter = 'all';      // 'all' | '真题' | '综合分析' | ...
+let topicsSubFilter = 'all';      // 'all' | '综合分析' | '形式主义·基层减负' | ...
+let topicsFilterMode = 'type';    // 'type' | 'theme'
+let topicsRealOnly = false;       // 只看真题
 
 function switchTopicsMainTab(tab, btn) {
   topicsMainTab = tab;
   topicsSubFilter = 'all';
+  topicsFilterMode = 'type';
+  topicsRealOnly = false;
   document.querySelectorAll('.topics-main-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.getElementById('topics-search').value = '';
@@ -6023,8 +6027,15 @@ function switchTopicsMainTab(tab, btn) {
   renderTopicsPage();
 }
 
-function toggleRealFilter() {
-  if (topicsSubFilter === '真题') { topicsSubFilter = 'all'; } else { topicsSubFilter = '真题'; }
+function toggleTopicsFilterMode(mode) {
+  if (topicsFilterMode === mode) return;
+  topicsFilterMode = mode;
+  topicsSubFilter = 'all';
+  renderTopicsPage();
+}
+
+function toggleRealOnly() {
+  topicsRealOnly = !topicsRealOnly;
   renderTopicsPage();
 }
 
@@ -6043,6 +6054,8 @@ function clearTopicsSearch() {
 function goTopics() {
   topicsSearch = '';
   topicsSubFilter = 'all';
+  topicsFilterMode = 'type';
+  topicsRealOnly = false;
   const inp = document.getElementById('topics-search');
   if (inp) inp.value = '';
   // 同步主 tab 高亮
@@ -6190,11 +6203,31 @@ function renderTopicsPage() {
 
   // ── 渲染子筛选 bar ──
   if (topicsMainTab === 'interview') {
-    const interviewSubs = ['all', '真题', ...new Set(INTERVIEW_TOPICS.map(t => t.subtype))];
-    const labels = { all: '全部', '真题': '真题', '综合分析': '综合分析', '人际关系': '人际关系', '计划组织': '计划组织', '应急处突': '应急处突', '自我认知': '自我认知' };
-    document.getElementById('topics-sub-filter').innerHTML = interviewSubs.map(s =>
-      `<button class="filter-btn${topicsSubFilter === s ? ' active' : ''}" onclick="${s === '真题' ? 'toggleRealFilter()' : `topicsSubFilter='${s}';renderTopicsPage()`}">${labels[s]||s}</button>`
-    ).join('');
+    // 维度切换 + 真题开关
+    const modeBtns = `
+      <button class="filter-btn${topicsFilterMode === 'type' ? ' active' : ''}" onclick="toggleTopicsFilterMode('type')">按题型</button>
+      <button class="filter-btn${topicsFilterMode === 'theme' ? ' active' : ''}" onclick="toggleTopicsFilterMode('theme')">按主题</button>
+    `;
+    const realToggle = `<label style="display:inline-flex;align-items:center;gap:4px;margin-left:auto;cursor:pointer;font-size:12px;color:var(--muted);white-space:nowrap;">
+      <input type="checkbox" ${topicsRealOnly ? 'checked' : ''} onchange="toggleRealOnly()" style="accent-color:var(--gold);">
+      只看真题
+    </label>`;
+    document.getElementById('topics-sub-filter').innerHTML = `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${modeBtns}${realToggle}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;" id="topics-sub-chips"></div>`;
+
+    // 子选项 chips
+    let chipsHtml = '';
+    if (topicsFilterMode === 'type') {
+      const subs = ['all', ...new Set(INTERVIEW_TOPICS.map(t => t.subtype))];
+      const labels = { all: '全部', '综合分析': '综合分析', '人际关系': '人际关系', '计划组织': '计划组织', '应急处突': '应急处突', '自我认知': '自我认知' };
+      chipsHtml = subs.map(s => `<button class="filter-btn${topicsSubFilter === s ? ' active' : ''}" onclick="topicsSubFilter='${s}';renderTopicsPage()">${labels[s]||s}</button>`).join('');
+    } else {
+      const themes = ['all', ...new Set(INTERVIEW_TOPICS.filter(t => t.theme).map(t => t.theme))];
+      chipsHtml = themes.map(th => {
+        const short = th === 'all' ? '全部' : th.replace('·', ' ');
+        return `<button class="filter-btn${topicsSubFilter === th ? ' active' : ''}" onclick="topicsSubFilter='${th.replace(/'/g,"\\'")}';renderTopicsPage()">${short}</button>`;
+      }).join('');
+    }
+    document.getElementById('topics-sub-chips').innerHTML = chipsHtml;
   } else if (topicsMainTab === 'free') {
     const themes = [...new Set(TOPICS.map(t => t.theme))];
     document.getElementById('topics-sub-filter').innerHTML = themes.map((th, i) =>
@@ -6222,11 +6255,16 @@ function renderTopicsPage() {
   // ═══ Tab 1: 结构化面试 ═══
   if (topicsMainTab === 'interview') {
     let list = INTERVIEW_TOPICS;
-    if (topicsSubFilter === '真题') {
-      list = list.filter(t => t.source);
-    } else if (topicsSubFilter !== 'all') {
-      list = list.filter(t => t.subtype === topicsSubFilter);
+    // 子筛选：按题型 OR 按主题
+    if (topicsFilterMode === 'type') {
+      if (topicsSubFilter !== 'all') list = list.filter(t => t.subtype === topicsSubFilter);
+    } else {
+      if (topicsSubFilter === 'all') list = list.filter(t => t.theme);
+      else list = list.filter(t => t.theme === topicsSubFilter);
     }
+    // 真题开关
+    if (topicsRealOnly) list = list.filter(t => t.source);
+    // 按题型分组展示
     const subtypes = [...new Set(list.map(t => t.subtype))];
     subtypes.forEach(sub => {
       const items = list.filter(t => t.subtype === sub);
