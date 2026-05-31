@@ -6234,7 +6234,7 @@ function renderTopicsPage() {
       html += items.map(t => {
         const idx = INTERVIEW_TOPICS.indexOf(t);
         const done = practiced.has(t.text);
-        const metaHtml = `<span class="theme-badge">${t.subtype}</span>` + (t.source ? `<span class="bank-item-source">${t.source}</span>` : '');
+        const metaHtml = `<span class="theme-badge">${t.subtype}</span>` + (t.theme ? `<span class="bank-item-source" style="color:var(--gold);">${t.theme}</span>` : '') + (t.source ? `<span class="bank-item-source">${t.source}</span>` : '');
         const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}<button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>`;
         return renderItem(t.text, metaHtml, btnsHtml, done, t.text);
       }).join('');
