@@ -933,6 +933,12 @@ input:focus { outline: none; border-color: var(--gold); }
     <button onclick="toggleOptimize()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;" id="optimize-toggle-btn">优化版本 ▶</button>
     <div id="optimize-expanded" style="display:none;margin-top:10px;">
       <div class="example-body" id="optimize-text"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;" id="optimize-save-btns">
+        <button onclick="saveOptimizeToTopic()" id="optimize-topic-save-btn"
+          style="flex:1;background:none;border:1px solid #444;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 10px;">
+          存到题目
+        </button>
+      </div>
     </div>
   </div>
 
@@ -945,6 +951,12 @@ input:focus { outline: none; border-color: var(--gold); }
         <button class="preset-btn" onclick="selectHighScoreStyle('interview',this)">面试风</button>
       </div>
       <div class="example-body" id="highscore-text"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;" id="highscore-save-btns">
+        <button onclick="saveHighScoreToTopic()" id="highscore-topic-save-btn"
+          style="flex:1;background:none;border:1px solid #444;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 10px;">
+          存到题目
+        </button>
+      </div>
     </div>
   </div>
 
@@ -5531,6 +5543,33 @@ function saveExampleToTopic() {
   // 更新卡片
   loadSavedExampleCard(topicText);
   const btn = document.getElementById('example-topic-save-btn');
+  if (btn) { btn.textContent = '已存到题目 ✓'; btn.style.color = 'var(--gold)'; btn.style.borderColor = 'var(--gold)'; }
+}
+
+function saveOptimizeToTopic() {
+  const topicText = S.topic?.text || allSessions[0]?.topic;
+  if (!topicText) return;
+  const content = document.getElementById('optimize-text')?.innerText?.trim();
+  if (!content) return;
+  saveTopicExampleData(String(topicText), { content, outline: '', style: '优化版本', date: today() });
+  loadSavedExampleCard(String(topicText));
+  const btn = document.getElementById('optimize-topic-save-btn');
+  if (btn) { btn.textContent = '已存到题目 ✓'; btn.style.color = 'var(--gold)'; btn.style.borderColor = 'var(--gold)'; }
+}
+
+function saveHighScoreToTopic() {
+  const topicText = S.topic?.text || allSessions[0]?.topic;
+  if (!topicText) return;
+  const contentEl = document.getElementById('highscore-text');
+  if (!contentEl) return;
+  // 找到当前激活的style
+  const activeBtn = document.querySelector('#highscore-style-chips .preset-btn.active');
+  const styleLabel = activeBtn ? (activeBtn.textContent.trim()) : '高分示范';
+  const content = contentEl.innerText?.trim();
+  if (!content) return;
+  saveTopicExampleData(String(topicText), { content, outline: '', style: styleLabel, date: today() });
+  loadSavedExampleCard(String(topicText));
+  const btn = document.getElementById('highscore-topic-save-btn');
   if (btn) { btn.textContent = '已存到题目 ✓'; btn.style.color = 'var(--gold)'; btn.style.borderColor = 'var(--gold)'; }
 }
 
