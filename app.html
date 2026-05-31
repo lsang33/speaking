@@ -398,18 +398,21 @@ input:focus { outline: none; border-color: var(--gold); }
 .mat-content { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 .mat-content.mat-expanded { display:block; overflow:visible; }
 .mat-toggle { background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; padding:2px 0 0; text-align:left; }
-.bank-item { background:var(--card); border-radius:10px; padding:12px 14px; display:flex; align-items:flex-start; gap:10px; margin-bottom:5px; flex-wrap:wrap; }
+.bank-item { background:var(--card); border-radius:10px; padding:10px 14px; display:flex; flex-direction:column; gap:6px; margin-bottom:5px; }
 .bank-item-note { background:none; border:none; color:#555; font-size:13px; cursor:pointer; padding:2px 4px; flex-shrink:0; line-height:1; transition:color .15s; }
 .bank-item-note.has-note { color:var(--gold); }
-.topic-note-area { width:100%; margin-top:8px; padding-top:8px; border-top:1px solid #2a2a30; }
-.bank-item-text { flex:1; font-size:14px; line-height:1.5; }
+.topic-note-area { width:100%; margin-top:4px; padding-top:6px; border-top:1px solid #2a2a30; }
+.bank-item-text { font-size:14px; line-height:1.6; }
 .bank-item-del { background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; padding:2px 0; flex-shrink:0; margin-top:2px; }
-.bank-item-practice { background:none; border:1px solid #444; border-radius:6px; color:var(--muted); font-size:12px; cursor:pointer; padding:3px 10px; flex-shrink:0; transition:all .15s; }
+.bank-item-practice { background:none; border:1px solid #444; border-radius:6px; color:var(--muted); font-size:11px; cursor:pointer; padding:2px 8px; flex-shrink:0; transition:all .15s; white-space:nowrap; }
 .bank-item-practice:active { background:var(--gold); border-color:var(--gold); color:#000; }
-.bank-item-fav { background:none; border:none; color:#555; font-size:16px; cursor:pointer; padding:2px 4px; flex-shrink:0; line-height:1; transition:color .15s; margin-top:1px; }
+.bank-item-fav { background:none; border:none; color:#555; font-size:15px; cursor:pointer; padding:2px 4px; flex-shrink:0; line-height:1; transition:color .15s; }
 .bank-item-fav.active { color:var(--gold); }
 .bank-item.practiced { opacity:.5; }
 .bank-item.practiced .bank-item-text { text-decoration-color: #555; }
+.bank-item-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.bank-item-tags { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.bank-item-source { font-size:10px; color:var(--muted); background:var(--card2); padding:1px 6px; border-radius:4px; white-space:nowrap; }
 .practiced-badge { font-size:10px; color:var(--gold); opacity:.7; margin-left:6px; vertical-align:middle; }
 .picker-topic-item.practiced { opacity:.5; }
 .interview-section-header { background:rgba(212,168,67,.08); border:1px solid rgba(212,168,67,.3); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
@@ -6203,6 +6206,18 @@ function renderTopicsPage() {
 
   let html = '';
 
+  // ═══ 通用 item 渲染 ── 两行布局：题目文字 + 底部 meta │ 按钮 ═══
+  function renderItem(text, metaHtml, btnsHtml, done, noteText) {
+    return `<div class="bank-item${done ? ' practiced' : ''}">
+      <div class="bank-item-text">${text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(text)}</div>
+      <div class="bank-item-meta">
+        <div class="bank-item-tags">${metaHtml}</div>
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">${btnsHtml}</div>
+      </div>
+      ${noteArea(noteText || text, notes)}
+    </div>`;
+  }
+
   // ═══ Tab 1: 结构化面试 ═══
   if (topicsMainTab === 'interview') {
     let list = INTERVIEW_TOPICS;
@@ -6219,16 +6234,9 @@ function renderTopicsPage() {
       html += items.map(t => {
         const idx = INTERVIEW_TOPICS.indexOf(t);
         const done = practiced.has(t.text);
-        const srcBadge = t.source ? '<span style="font-size:10px;color:var(--gold);margin-left:4px;border:1px solid var(--gold);border-radius:4px;padding:0 4px;">真题</span>' : '';
-        return `<div class="bank-item${done ? ' practiced' : ''}">
-          <div class="bank-item-text">${t.text}${srcBadge}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</div>
-          <div class="flex gap-6" style="flex-shrink:0;align-items:center;">
-            ${noteBtn(t.text, notes)}
-            ${favBtn(t.text, favs)}
-            <button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>
-          </div>
-          ${noteArea(t.text, notes)}
-        </div>`;
+        const metaHtml = `<span class="theme-badge">${t.subtype}</span>` + (t.source ? `<span class="bank-item-source">${t.source}</span>` : '');
+        const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}<button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>`;
+        return renderItem(t.text, metaHtml, btnsHtml, done, t.text);
       }).join('');
     });
     if (!list.length) html = '<div class="muted" style="text-align:center;padding:30px 0;">暂无题目</div>';
@@ -6243,16 +6251,9 @@ function renderTopicsPage() {
     html += items.map(t => {
       const idx = TOPICS.indexOf(t);
       const done = practiced.has(t.text);
-      const srcBadge = t.source ? '<span style="font-size:10px;color:var(--gold);margin-left:4px;border:1px solid var(--gold);border-radius:4px;padding:0 4px;">真题</span>' : '';
-      return `<div class="bank-item${done ? ' practiced' : ''}">
-        <div class="bank-item-text">${t.text}${srcBadge}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</div>
-        <div class="flex gap-6" style="flex-shrink:0;align-items:center;">
-          ${noteBtn(t.text, notes)}
-          ${favBtn(t.text, favs)}
-          <button class="bank-item-practice" onclick="startBuiltinTopic(${idx})">练习</button>
-        </div>
-        ${noteArea(t.text, notes)}
-      </div>`;
+      const metaHtml = t.source ? `<span class="bank-item-source">${t.source}</span>` : '';
+      const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}<button class="bank-item-practice" onclick="startBuiltinTopic(${idx})">练习</button>`;
+      return renderItem(t.text, metaHtml, btnsHtml, done, t.text);
     }).join('');
   }
 
@@ -6262,23 +6263,14 @@ function renderTopicsPage() {
       html = '<div class="muted" style="text-align:center;padding:40px 0;">还没有收藏题目<br><span style="font-size:12px;">点击题目旁的 ☆ 即可收藏</span></div>';
     } else {
       html += `<div class="bank-section-title" style="color:var(--gold);">★ 收藏（${favs.size}）</div>`;
-      const allT = [...TOPICS.map(t => ({ ...t })), ...INTERVIEW_TOPICS.map(t => ({ text: t.text, theme: '结构化面试', d: 2 })), ...customs];
+      const allT = [...TOPICS.map(t => ({ ...t })), ...INTERVIEW_TOPICS.map(t => ({ text: t.text, theme: '结构化面试', d: 2, subtype: t.subtype })), ...customs];
       html += [...favs].map(text => {
         const t = allT.find(x => x.text === text);
         if (!t) return '';
         const done = practiced.has(text);
-        return `<div class="bank-item${done ? ' practiced' : ''}">
-          <div style="flex:1;min-width:0;">
-            <span class="theme-badge" style="margin-bottom:4px;">${t.theme}</span>
-            <div class="bank-item-text">${text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(text)}</div>
-          </div>
-          <div class="flex gap-6" style="flex-shrink:0;align-items:center;">
-            ${noteBtn(text, notes)}
-            ${favBtn(text, favs)}
-            <button class="bank-item-practice" data-favtext="${text.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" onclick="startFavoriteTopic(this.dataset.favtext)">练习</button>
-          </div>
-          ${noteArea(text, notes)}
-        </div>`;
+        const metaHtml = `<span class="theme-badge">${t.theme || ''}</span>`;
+        const btnsHtml = `${noteBtn(text, notes)}${favBtn(text, favs)}<button class="bank-item-practice" data-favtext="${text.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" onclick="startFavoriteTopic(this.dataset.favtext)">练习</button>`;
+        return renderItem(text, metaHtml, btnsHtml, done, text);
       }).join('');
     }
   }
@@ -6292,19 +6284,9 @@ function renderTopicsPage() {
       html += `<div class="bank-section-title">自定义题目 <span style="font-weight:400;opacity:.6;">${doneCount}/${customs.length}</span></div>`;
       html += customs.map((t, i) => {
         const done = practiced.has(t.text);
-        return `<div class="bank-item${done ? ' practiced' : ''}">
-          <div class="bank-item-text">
-            <span class="theme-badge">${t.theme}</span>
-            <span style="display:block;margin-top:5px;">${t.text}${done ? '<span class="practiced-badge">✓</span>' : ''}${exBadge(t.text)}</span>
-          </div>
-          <div class="flex gap-6" style="flex-shrink:0;align-items:center;">
-            ${noteBtn(t.text, notes)}
-            ${favBtn(t.text, favs)}
-            <button class="bank-item-practice" onclick="startCustomTopic(${i})">练习</button>
-            <button class="bank-item-del" onclick="deleteCustomTopic(${i})">删除</button>
-          </div>
-          ${noteArea(t.text, notes)}
-        </div>`;
+        const metaHtml = `<span class="theme-badge">${t.theme}</span>`;
+        const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}<button class="bank-item-practice" onclick="startCustomTopic(${i})">练习</button><button class="bank-item-del" onclick="deleteCustomTopic(${i})">删</button>`;
+        return renderItem(t.text, metaHtml, btnsHtml, done, t.text);
       }).join('');
     }
   }
