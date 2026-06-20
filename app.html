@@ -962,27 +962,31 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <div id="res-evals" class="flex col gap-10"></div>
 
-  <div style="background:var(--card); border-radius:var(--r); padding:16px; text-align:center; font-size:15px; font-weight:500; color:var(--gold); line-height:1.6;" id="res-cheer"></div>
-
   <!-- 反思与改进：跟上次比 + 可引用案例 + 说话节奏 -->
   <div id="res-improve" style="display:block;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:14px 16px;">
     <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px;">🔄 反思与改进</div>
 
     <div id="res-compare" style="display:none;">
       <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">📌 跟上次比</div>
-      <div id="res-compare-content" style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:10px;"></div>
+      <div id="res-compare-content" style="font-size:13px;color:var(--muted);line-height:1.7;"></div>
     </div>
+
+    <div id="res-compare-sep" style="display:none;height:1px;background:var(--divider);margin:12px 0;"></div>
 
     <div id="res-cases" style="display:none;">
       <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">💡 这道题可以引用</div>
-      <div id="res-cases-content" style="font-size:13px;color:var(--text);line-height:1.7;margin-bottom:10px;"></div>
+      <div id="res-cases-content" style="font-size:13px;color:var(--text);line-height:1.7;"></div>
     </div>
+
+    <div id="res-cases-sep" style="display:none;height:1px;background:var(--divider);margin:12px 0;"></div>
 
     <div id="res-rhythm" style="display:block;">
       <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">📈 说话节奏</div>
+      <div style="font-size:11px;color:var(--muted-extra);margin-bottom:4px;">波形起伏 = 说话音量，红条 = 卡顿停顿</div>
       <canvas id="rhythm-canvas" style="width:100%;height:140px;border-radius:8px;background:var(--card2);display:block;"></canvas>
+      <div style="font-size:11px;color:var(--muted-extra);margin:8px 0 4px;">每段柱高 = 该段语速，绿色正常 · 偏快/偏慢会变色</div>
       <canvas id="pace-canvas" style="width:100%;height:60px;border-radius:8px;background:var(--card2);margin-top:6px;display:block;"></canvas>
-      <div id="rhythm-notes" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
+      <div id="rhythm-notes" style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;"></div>
     </div>
   </div>
 
@@ -1899,10 +1903,9 @@ function switchHomeTopicMode(e) {
 
 function retryTopic() {
   // 保存本轮反馈，供再次练习时 AI 参考
-  const cheerEl = document.getElementById('res-cheer');
   const casesEl = document.getElementById('res-cases-content');
   const compareEl = document.getElementById('res-compare-content');
-  let fb = cheerEl ? cheerEl.textContent : '';
+  let fb = '';
   if (casesEl && casesEl.textContent.trim()) {
     fb += ' | 推荐案例：' + casesEl.textContent.trim().replace(/\n/g, ' ');
   }
@@ -4775,9 +4778,6 @@ function showResult(session, evalText) {
     expSection.style.display = 'none';
   }
 
-  const cm = evalText.match(/\*\*鼓励\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
-  document.getElementById('res-cheer').textContent = cm ? cm[1].trim() : '继续坚持，每天进步一点点。';
-
   // ── 跟上次比 ──
   const prevSession = findLastSimilarSession(session);
   const compareEl = document.getElementById('res-compare');
@@ -4809,6 +4809,7 @@ function showResult(session, evalText) {
   } else {
     compareEl.style.display = 'none';
   }
+  document.getElementById('res-compare-sep').style.display = compareEl.style.display;
 
   // ── 可引用案例 ──
   const casesEl = document.getElementById('res-cases');
@@ -4826,6 +4827,7 @@ function showResult(session, evalText) {
   } else {
     casesEl.style.display = 'none';
   }
+  document.getElementById('res-cases-sep').style.display = casesEl.style.display;
 
   // 重置调试面板
   document.getElementById('debug-panel').style.display = 'none';
