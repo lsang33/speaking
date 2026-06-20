@@ -1647,7 +1647,7 @@ let S = {
   prepTime: parseInt(ls('prep_time') || '30', 10),
   targetDur: ls('target_dur') || '2-3',
   enableOptimize: ls('enable_optimize') !== '0',
-  enableHighScore: ls('enable_highscore') === '1',
+  enableHighScore: ls('enable_highscore') !== '0',
   interviewTwoStage: ls('interview_twostage') === '1',
   enableThinkModel: ls('enable_think_model') === '1',
   evalThinking: ls('eval_thinking') !== '0', // default true
