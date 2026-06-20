@@ -1,11 +1,12 @@
 // Service Worker for 每日说 PWA
-const CACHE = 'meirishuo-v1';
+const CACHE = 'meirishuo-v2';
 const PRECACHE = [
   '.',
   'app.html',
   'manifest.json',
   'topics.js',
   'arguments.js',
+  'words.js',
   'icons/icon-192.png',
   'icons/icon-512.png'
 ];
