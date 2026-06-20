@@ -978,10 +978,8 @@ input:focus { outline: none; border-color: var(--gold); }
 
     <div id="res-rhythm" style="display:block;">
       <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;border-left:2px solid var(--gold);padding-left:8px;">说话节奏</div>
-      <div style="font-size:11px;color:var(--muted-extra);margin-bottom:4px;">绿色 = 在说话，灰色 = 停顿/沉默</div>
+      <div style="font-size:11px;color:var(--muted-extra);margin-bottom:4px;">绿 = 在说话，灰 = 停顿沉默</div>
       <canvas id="rhythm-canvas" style="width:100%;height:140px;border-radius:8px;background:var(--card2);display:block;"></canvas>
-      <div style="font-size:11px;color:var(--muted-extra);margin:8px 0 4px;">每段柱高 = 语速，绿=正常 红=偏快/偏慢</div>
-      <canvas id="pace-canvas" style="width:100%;height:60px;border-radius:8px;background:var(--card2);margin-top:6px;display:block;"></canvas>
       <div id="rhythm-notes" style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;"></div>
     </div>
   </div>
@@ -2218,19 +2216,17 @@ async function renderRhythm(sessionId, duration, metrics, audioMetrics) {
     c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card2').trim() || '#eeeef2';
     c.fillRect(0, 0, w, h);
 
-    // activity timeline — replace waveform curve
+    // activity timeline: green = speaking, gray = pause/silence
     const greenColor = getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#4caf6e';
-    const redColor = getComputedStyle(document.documentElement).getPropertyValue('--red').trim() || '#e05252';
+    const grayColor = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8b8a94';
     const threshold = 0.03;
     const barStep = Math.max(1, Math.floor(normEnv.length / (pw / 3))); // ~3px per bar
     for (let i = 0; i < normEnv.length; i += barStep) {
       const avg = normEnv.slice(i, i + barStep).reduce((a, v) => a + v, 0) / barStep;
       const x = pad + (i / normEnv.length) * pw;
       const wBar = Math.max(1, (barStep / normEnv.length) * pw);
-      const barH = avg > threshold ? ph : ph * 0.15;
-      const y = pad + ph - barH;
-      c.fillStyle = avg > threshold ? greenColor + '99' : redColor + '40';
-      c.fillRect(x, y, wBar, barH);
+      c.fillStyle = avg > threshold ? greenColor + '99' : grayColor + '60';
+      c.fillRect(x, pad, wBar, ph);
     }
     // top stats (overwrite existing text with combined info)
     const penaltySec = ((parseInt(S.pausePenalty) || 4000) / 1000);
@@ -2252,45 +2248,11 @@ async function renderRhythm(sessionId, duration, metrics, audioMetrics) {
     c.font = 'bold 10px system-ui';
     c.fillText(`${metrics.chars || 0}字 · ${metrics.totalFillers || 0}口头禅 · 停顿${audioMetrics?.pauseCount || 0}次`, pad, pad + 10);
 
-    // ── Draw pace chart ──
-    const canvas2 = document.getElementById('pace-canvas');
-    if (!canvas2) { sectionEl.style.display = 'none'; return; }
-    const rect2 = canvas2.getBoundingClientRect();
-    const W2 = rect2.width * dpr, H2 = 60 * dpr;
-    canvas2.width = W2; canvas2.height = H2;
-    canvas2.style.width = rect2.width + 'px'; canvas2.style.height = '60px';
-    const c2 = canvas2.getContext('2d');
-    c2.scale(dpr, dpr);
-    const w2 = rect2.width, h2 = 60;
-    const segments = 6;
-    const segW = (w2 - pad * 2) / segments;
-    const segSec = totalSec / segments;
-    const charsPerSeg = (metrics.chars || 1) / segments;
-    c2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card2').trim() || '#eeeef2';
-    c2.fillRect(0, 0, w2, h2);
-    const maxPace = Math.max(charsPerSeg / (segSec / 60), 100);
-    for (let i = 0; i < segments; i++) {
-      const segPace = charsPerSeg / (segSec / 60);
-      const barH = Math.min((segPace / (maxPace * 1.2)) * (h2 - 20 - pad), h2 - 20 - pad);
-      const x = pad + i * segW;
-      c2.fillStyle = segPace > 320 ? 'var(--red)' : segPace > 290 ? 'var(--warn)' : segPace < 140 ? 'var(--red)' : 'var(--green)';
-      c2.globalAlpha = 0.6;
-      c2.fillRect(x + 2, pad + (h2 - 20 - pad) - barH, segW - 4, barH);
-      c2.globalAlpha = 1;
-      c2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8b8a94';
-      c2.font = '9px system-ui';
-      c2.fillText(Math.round(segPace), x + segW / 2 - 14, pad + (h2 - 20 - pad) - barH - 3);
-    }
-
     // ── Notes ──
     const notesEl = document.getElementById('rhythm-notes');
     if (notesEl) {
-      const longestSegment = Math.max(...Array(segments).fill(0).map((_, i) => charsPerSeg / (segSec / 60)));
-      const hasLongNoStop = audioMetrics?.longestPause > penaltySec;
       notesEl.innerHTML =
-        `· 最长连续无停顿段落约 ${Math.round(segSec)} 秒<br>` +
-        `· 停顿 ${audioMetrics?.pauseCount || 0} 次（卡顿 ${audioMetrics?.pauses?.filter(p => p >= penaltySec).length || 0} 次）<br>` +
-        `· 最快段 ${Math.round(longestSegment)} 字/分 · 音量变化 ${audioMetrics?.volumeCV ? (audioMetrics.volumeCV < 0.25 ? '较单调' : audioMetrics.volumeCV < 0.5 ? '有起伏' : '变化丰富') : '—'}` +
+        `· 停顿 ${audioMetrics?.pauseCount || 0} 次（卡顿 ${audioMetrics?.pauses?.filter(p => p >= penaltySec).length || 0} 次）` +
         (duration < 60 ? '<br><span style="color:var(--gold);">当前录音不足 60 秒，节奏分析仅供参考。</span>' : '');
     }
 
