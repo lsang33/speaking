@@ -4528,6 +4528,9 @@ function saveVariantTopic() {
 function retryEvalById(id) {
   const h = allSessions.find(s => s.id === id);
   if (!h) return;
+  // 移除旧记录，避免重新评估后产生同ID重复（删除时会被一起删掉）
+  allSessions = allSessions.filter(s => s.id !== id);
+  S.history = allSessions;
   S.transcript = h.transcript;
   S.sessionId = h.id;
   S.duration = h.duration || 0;
