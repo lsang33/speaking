@@ -249,17 +249,10 @@ input:focus { outline: none; border-color: var(--gold); }
 }
 
 /* ── SETTINGS ── */
-#cfg-enable-optimize:checked + span { background: var(--active-bg) !important; }
-#cfg-enable-optimize:checked + span::after { transform: translateY(-50%) translateX(18px); }
-#cfg-enable-highscore:checked + span { background: var(--active-bg) !important; }
-#cfg-enable-highscore:checked + span::after { transform: translateY(-50%) translateX(18px); }
-#cfg-interview-twostage:checked + span { background: var(--active-bg) !important; }
-#cfg-interview-twostage:checked + span::after { transform: translateY(-50%) translateX(18px); }
-#cfg-enable-think-model:checked + span { background: var(--active-bg) !important; }
-#cfg-enable-think-model:checked + span::after { transform: translateY(-50%) translateX(18px); }
-#cfg-eval-thinking:checked + span { background: var(--active-bg) !important; }
-#cfg-eval-thinking:checked + span::after { transform: translateY(-50%) translateX(18px); }
-#optimize-toggle-track::after { content:''; position:absolute; left:4px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%; background:var(--toggle-thumb); transition:.2s; }
+/* toggle switches */
+.toggle-wrap input[type="checkbox"] + span::after { content:''; position:absolute; left:4px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%; background:var(--toggle-thumb); transition:.2s; }
+.toggle-wrap input[type="checkbox"]:checked + span { background: var(--active-bg) !important; }
+.toggle-wrap input[type="checkbox"]:checked + span::after { transform: translateY(-50%) translateX(18px); }
 .type-btn {
   flex: 1; padding: 11px; border-radius: 10px;
   border: 1.5px solid var(--border); background: var(--card2);
@@ -1213,7 +1206,7 @@ input:focus { outline: none; border-color: var(--gold); }
         <div class="label">评分时使用思考模式</div>
         <div class="hint" style="font-size:12px; margin-top:2px;">关闭后评分不等待思考过程，更快但细节可能略少</div>
       </div>
-      <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+      <label class="toggle-wrap" style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
         <input type="checkbox" id="cfg-eval-thinking" style="opacity:0; width:0; height:0;">
         <span style="position:absolute;cursor:pointer;inset:0;background:var(--toggle-track);border-radius:13px;transition:.2s;"></span>
       </label>
@@ -1227,7 +1220,7 @@ input:focus { outline: none; border-color: var(--gold); }
         <div class="label">进阶模型</div>
         <div class="hint" style="font-size:12px; margin-top:2px;">用于：面试示范生成、高分示范；关闭则使用主模型</div>
       </div>
-      <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+      <label class="toggle-wrap" style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
         <input type="checkbox" id="cfg-enable-think-model" style="opacity:0; width:0; height:0;">
         <span style="position:absolute;cursor:pointer;inset:0;background:var(--toggle-track);border-radius:13px;transition:.2s;" id="think-model-toggle-track"></span>
       </label>
@@ -1340,7 +1333,7 @@ input:focus { outline: none; border-color: var(--gold); }
       <div class="label">评分后生成优化版本</div>
       <div class="hint" style="font-size:12px; margin-top:2px;">关闭可加快评分速度</div>
     </div>
-    <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+    <label class="toggle-wrap" style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
       <input type="checkbox" id="cfg-enable-optimize" style="opacity:0; width:0; height:0;">
       <span style="position:absolute;cursor:pointer;inset:0;background:var(--toggle-track);border-radius:13px;transition:.2s;" id="optimize-toggle-track"></span>
     </label>
@@ -1352,7 +1345,7 @@ input:focus { outline: none; border-color: var(--gold); }
       <div class="label">评分后生成高分示范版本</div>
       <div class="hint" style="font-size:12px; margin-top:2px;">85分水准，消耗较多 token</div>
     </div>
-    <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+    <label class="toggle-wrap" style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
       <input type="checkbox" id="cfg-enable-highscore" style="opacity:0; width:0; height:0;">
       <span style="position:absolute;cursor:pointer;inset:0;background:var(--toggle-track);border-radius:13px;transition:.2s;" id="highscore-toggle-track"></span>
     </label>
@@ -1364,7 +1357,7 @@ input:focus { outline: none; border-color: var(--gold); }
       <div class="label">面试示范两段式生成</div>
       <div class="hint" style="font-size:12px; margin-top:2px;">先生成骨架再口语化，质量更高但耗时翻倍</div>
     </div>
-    <label style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+    <label class="toggle-wrap" style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
       <input type="checkbox" id="cfg-interview-twostage" style="opacity:0; width:0; height:0;">
       <span style="position:absolute;cursor:pointer;inset:0;background:var(--toggle-track);border-radius:13px;transition:.2s;" id="twostage-toggle-track"></span>
     </label>
