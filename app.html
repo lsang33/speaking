@@ -2351,7 +2351,7 @@ function parseEvalSections(evalText) {
   ];
   return keys.map(k => {
     const m = evalText.match(new RegExp(`\\*\\*${k}\\*\\*[：:]([\\s\\S]*?)(?=\\*\\*|$)`));
-    return m ? { k, icon, text: m[1].trim() } : null;
+    return m ? { k, text: m[1].trim() } : null;
   }).filter(Boolean);
 }
 
@@ -5022,6 +5022,41 @@ function seekAudio(id, event) {
   audioEl.currentTime = pct * audioEl.duration;
 }
 
+async function toggleSimpleAudio(id, btnId) {
+  const btn = document.getElementById(btnId);
+  const audioEl = document.getElementById(`ael-${id}`);
+
+  if (currentPlayingId === id && !audioEl.paused) {
+    audioEl.pause();
+    btn.textContent = '▶ 播放';
+    currentPlayingId = null;
+    return;
+  }
+  if (currentPlayingId) {
+    const prev = document.getElementById(`ael-${currentPlayingId}`);
+    if (prev) prev.pause();
+    currentPlayingId = null;
+    document.querySelectorAll('.archive-play-btn').forEach(b => { if (b !== btn) b.textContent = '▶ 播放'; });
+  }
+  if (audioEl.src && !audioEl.paused) {
+    audioEl.pause();
+    btn.textContent = '▶ 播放';
+    return;
+  }
+  btn.textContent = '加载中…';
+  try {
+    const blob = await getAudio(id);
+    if (!blob) { btn.textContent = '无录音'; return; }
+    audioEl.src = URL.createObjectURL(blob);
+    audioEl.onended = () => { btn.textContent = '▶ 播放'; currentPlayingId = null; };
+    await audioEl.play();
+    btn.textContent = '⏸ 暂停';
+    currentPlayingId = id;
+  } catch (e) {
+    btn.textContent = '▶ 播放';
+  }
+}
+
 async function toggleAudio(id) {
   const btn = document.getElementById(`abtn-${id}`);
   const audioEl = document.getElementById(`ael-${id}`);
@@ -5731,13 +5766,13 @@ function renderArchive() {
         <div style="flex:1;min-width:140px;">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">最早的录音</div>
           <div style="font-size:12px;margin-bottom:6px;">${firstRec.date} · ${firstRec.topic?.slice(0, 20) || '—'}</div>
-          <button class="btn btn-ghost btn-sm" onclick="toggleAudio('${firstRec.id}')">▶ 播放</button>
+          <button id="archive-play-first" class="btn btn-ghost btn-sm archive-play-btn" onclick="toggleSimpleAudio('${firstRec.id}', 'archive-play-first')">▶ 播放</button>
           <audio id="ael-${firstRec.id}" style="display:none;"></audio>
         </div>
         <div style="flex:1;min-width:140px;">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">最近的录音</div>
           <div style="font-size:12px;margin-bottom:6px;">${lastRec.date} · ${lastRec.topic?.slice(0, 20) || '—'}</div>
-          <button class="btn btn-ghost btn-sm" onclick="toggleAudio('${lastRec.id}')">▶ 播放</button>
+          <button id="archive-play-last" class="btn btn-ghost btn-sm archive-play-btn" onclick="toggleSimpleAudio('${lastRec.id}', 'archive-play-last')">▶ 播放</button>
           <audio id="ael-${lastRec.id}" style="display:none;"></audio>
         </div>
       </div>`;
