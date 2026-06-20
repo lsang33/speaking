@@ -2403,7 +2403,7 @@ function renderHistList(sessions) {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <span style="font-size:12px;color:var(--muted);">展开详情</span>
           <div class="flex gap-6">
-            ${h.score === '—' ? `<button class="btn btn-ghost btn-sm" onclick="retryEvalById('${h.id}');event.stopPropagation();" style="font-size:13px;">↻ 重新评估</button>` : ''}
+            ${h.score === '—' ? `<button class="btn btn-ghost btn-sm" onclick="this.textContent='评估中…';this.disabled=true;this.style.opacity='0.6';retryEvalById('${h.id}');event.stopPropagation();" style="font-size:13px;">↻ 重新评估</button>` : ''}
             <button class="btn btn-ghost btn-sm" onclick="retryHistSession('${h.id}');event.stopPropagation();" style="font-size:13px;">↩ 重试</button>
           </div>
         </div>
@@ -4516,7 +4516,7 @@ function retryEvalById(id) {
   const h = allSessions.find(s => s.id === id);
   if (!h) return;
   S.transcript = h.transcript;
-  S.sessionId = h.id; // reuse same ID so saveSession overwrites
+  S.sessionId = h.id;
   S.mode = h.mode || 'topic';
   S.topic = { text: h.topic, theme: h.theme, d: 2 };
   if (h.mode === 'word') S.words = h.words || [];
