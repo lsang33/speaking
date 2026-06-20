@@ -976,10 +976,9 @@ input:focus { outline: none; border-color: var(--gold); }
     <div id="res-cases" style="display:none;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
         <span style="font-size:12px;font-weight:600;color:var(--muted);border-left:2px solid var(--gold);padding-left:8px;">如果再说一次，中间可以这样说</span>
-        <button onclick="toggleCasesBody()" id="cases-toggle-btn" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0;">展开 ▲</button>
+        <button onclick="toggleCasesBody()" id="cases-toggle-btn" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0;display:none;">展开 ▲</button>
       </div>
-      <div id="res-cases-content" style="font-size:13px;color:var(--text);line-height:1.7;"></div>
-      <div id="res-cases-more" style="display:none;font-size:13px;color:var(--text);line-height:1.7;margin-top:4px;"></div>
+      <div id="res-cases-body" style="font-size:13px;color:var(--text);line-height:1.7;"></div>
     </div>
 
     <div id="res-cases-sep" style="display:none;height:1px;background:var(--divider);margin:12px 0;"></div>
@@ -1906,17 +1905,17 @@ function switchHomeTopicMode(e) {
 }
 
 function toggleCasesBody() {
-  const more = document.getElementById('res-cases-more');
+  const wrap = document.getElementById('cases-more-wrap');
   const btn = document.getElementById('cases-toggle-btn');
-  if (!more || !btn) return;
-  const show = more.style.display === 'none' || !more.style.display;
-  more.style.display = show ? 'block' : 'none';
+  if (!wrap || !btn) return;
+  const show = wrap.style.display === 'none' || !wrap.style.display;
+  wrap.style.display = show ? 'block' : 'none';
   btn.textContent = show ? '收起 ▲' : '展开 ▲';
 }
 
 function retryTopic() {
   // 保存本轮反馈，供再次练习时 AI 参考
-  const casesEl = document.getElementById('res-cases-content');
+  const casesEl = document.getElementById('res-cases-body');
   const compareEl = document.getElementById('res-compare-content');
   let fb = '';
   if (casesEl && casesEl.textContent.trim()) {
@@ -4820,22 +4819,21 @@ function showResult(session, evalText) {
 
   // ── 如果再说一次 ──
   const casesEl = document.getElementById('res-cases');
-  const casesContent = document.getElementById('res-cases-content');
-  const casesMore = document.getElementById('res-cases-more');
+  const casesBody = document.getElementById('res-cases-body');
   const casesBtn = document.getElementById('cases-toggle-btn');
   const casesM = evalText.match(/\*\*可引用案例\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   if (casesM) {
     const raw = casesM[1].trim();
-    const items = raw.split('\n').filter(l => l.trim()).map(l => l.replace(/^[\s·\-\*\d]+[.\s]*/, '').trim());
-    if (items.length && items[0] !== '无') {
-      casesContent.innerHTML = `<div style="margin-bottom:6px;">${items[0]}</div>`;
-      if (items.length > 1) {
-        casesMore.innerHTML = items.slice(1).map(s => `<div style="margin-bottom:6px;">${s}</div>`).join('');
-        casesMore.style.display = 'none';
-        if (casesBtn) { casesBtn.style.display = 'inline'; casesBtn.textContent = '展开 ▲'; }
-      } else {
-        casesMore.innerHTML = '';
+    const items = raw.split('\n').filter(l => l.trim()).map(l => l.replace(/^[\s·\-\*\d]+[.\s]*/, '').trim()).filter(s => s !== '无');
+    if (items.length) {
+      if (items.length <= 2) {
+        // 1-2条：全部显示，不用折叠
+        casesBody.innerHTML = items.map(s => `<div style="margin-bottom:6px;">· ${s}</div>`).join('');
         if (casesBtn) casesBtn.style.display = 'none';
+      } else {
+        // 3条以上：显示前1条，其余折叠
+        casesBody.innerHTML = `<div style="margin-bottom:6px;">· ${items[0]}</div><div id="cases-more-wrap" style="display:none;">${items.slice(1).map(s => `<div style="margin-bottom:6px;">· ${s}</div>`).join('')}</div>`;
+        if (casesBtn) { casesBtn.style.display = 'inline'; casesBtn.textContent = '展开 ▲'; }
       }
       casesEl.style.display = 'block';
     } else {
