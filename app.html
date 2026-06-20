@@ -1026,11 +1026,16 @@ input:focus { outline: none; border-color: var(--gold); }
     <button onclick="toggleOptimize()" style="background:none;border:none;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;padding:0;" id="optimize-toggle-btn">优化版本 ▶</button>
     <div id="optimize-expanded" style="display:none;margin-top:10px;">
       <div class="example-body" id="optimize-text"></div>
-      <div style="display:flex;gap:8px;margin-top:12px;" id="optimize-save-btns">
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;" id="optimize-save-btns">
         <button onclick="saveOptimizeToTopic()" id="optimize-topic-save-btn"
           style="flex:1;background:none;border:1px solid var(--border-light);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 10px;">
           存到题目
         </button>
+        <button onclick="playOptimizeTTS()" id="optimize-tts-btn"
+          style="flex:1;background:none;border:1px solid var(--border-light);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;padding:6px 10px;display:none;">
+          🔊 听示范朗读
+        </button>
+        <audio id="tts-audio" style="display:none;"></audio>
       </div>
     </div>
   </div>
@@ -1312,6 +1317,31 @@ input:focus { outline: none; border-color: var(--gold); }
       <input type="number" id="cfg-prep-time" min="0" max="600" style="width:100px; padding:10px 12px;" placeholder="秒"/>
       <span class="muted" style="font-size:13px;">秒（0 = 不倒计时）</span>
     </div>
+  </div>
+
+  <!-- TTS 语音朗读 -->
+  <div class="flex" style="align-items:center; justify-content:space-between;">
+    <div>
+      <div class="label">示范朗读</div>
+      <div class="hint" style="font-size:12px; margin-top:2px;">结果页可听专业语速朗读优化版</div>
+    </div>
+    <label class="toggle-wrap" style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+      <input type="checkbox" id="cfg-tts-enabled" onchange="document.getElementById('tts-fields').style.display=this.checked?'':'none'" style="opacity:0; width:0; height:0;">
+      <span style="position:absolute;cursor:pointer;inset:0;background:var(--toggle-track);border-radius:13px;transition:.2s;"></span>
+    </label>
+  </div>
+  <div id="tts-fields" class="flex col gap-6" style="display:none;">
+    <div class="label" style="font-size:10px;">TTS 地址</div>
+    <input type="text" id="cfg-tts-url" placeholder="留空则用SiliconFlow" autocomplete="off"/>
+    <div class="label" style="font-size:10px;">发音人</div>
+    <div class="flex gap-6" id="tts-voice-chips">
+      <button class="preset-btn" onclick="setTtsVoice('alloy',this)" style="flex:1;">alloy</button>
+      <button class="preset-btn" onclick="setTtsVoice('echo',this)" style="flex:1;">echo</button>
+      <button class="preset-btn" onclick="setTtsVoice('fable',this)" style="flex:1;">fable</button>
+      <button class="preset-btn" onclick="setTtsVoice('nova',this)" style="flex:1;">nova</button>
+      <button class="preset-btn" onclick="setTtsVoice('shimmer',this)" style="flex:1;">shimmer</button>
+    </div>
+    <div class="hint" style="font-size:12px;">兼容 OpenAI TTS 格式的 API；发音人为 SiliconFlow 支持的 voice 列表</div>
   </div>
 
   <!-- 目标时长 -->
@@ -1732,6 +1762,9 @@ let S = {
   lastFeedback: '',
   retryCount: 0,
   favIds: JSON.parse(ls('favs') || '[]'),
+  ttsUrl: ls('tts_url') || '',
+  ttsVoice: ls('tts_voice') || 'alloy',
+  ttsEnabled: ls('tts_enabled') === '1',
 };
 
 /* ═══════════════════════════════════════
@@ -2631,6 +2664,12 @@ function goSettings() {
   document.getElementById('cfg-enable-think-model').checked = S.enableThinkModel;
   document.getElementById('cfg-eval-thinking').checked = S.evalThinking;
   document.getElementById('cfg-filter-low-scores').checked = S.filterLowScores;
+  document.getElementById('cfg-tts-enabled').checked = S.ttsEnabled;
+  document.getElementById('cfg-tts-url').value = S.ttsUrl;
+  document.getElementById('tts-fields').style.display = S.ttsEnabled ? '' : 'none';
+  document.querySelectorAll('#tts-voice-chips .preset-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === S.ttsVoice);
+  });
   document.getElementById('cfg-think-model').value = S.thinkModel;
   updateTargetDurChips(S.targetDur);
   show('s-settings');
@@ -2652,6 +2691,12 @@ function setApiType(type) {
   if (type === 'anthropic' && !document.getElementById('cfg-model').value) {
     document.getElementById('cfg-model').value = 'claude-haiku-4-5';
   }
+}
+
+function setTtsVoice(voice, btn) {
+  S.ttsVoice = voice;
+  document.querySelectorAll('#tts-voice-chips .preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
 }
 
 function setAsrType(type) {
@@ -2745,6 +2790,11 @@ function saveSettings() {
   ls('eval_thinking', S.evalThinking ? '1' : '0');
   S.filterLowScores = document.getElementById('cfg-filter-low-scores').checked;
   ls('filter_low_scores', S.filterLowScores ? '1' : '0');
+  S.ttsEnabled = document.getElementById('cfg-tts-enabled').checked;
+  ls('tts_enabled', S.ttsEnabled ? '1' : '0');
+  S.ttsUrl = document.getElementById('cfg-tts-url').value.trim();
+  ls('tts_url', S.ttsUrl);
+  ls('tts_voice', S.ttsVoice);
   ls('target_dur', S.targetDur);
   goHome();
 }
@@ -4540,6 +4590,49 @@ ${session.transcript}`;
   }
 }
 
+function playOptimizeTTS() {
+  const btn = document.getElementById('optimize-tts-btn');
+  const audio = document.getElementById('tts-audio');
+  const textEl = document.getElementById('optimize-text');
+  const text = textEl ? textEl.textContent.trim() : '';
+  if (!text) return;
+
+  // If already playing, toggle pause
+  if (!audio.paused && audio.dataset.text === text) {
+    audio.pause();
+    btn.textContent = '🔊 听示范朗读';
+    return;
+  }
+
+  btn.textContent = '生成中…';
+  btn.disabled = true;
+
+  const baseUrl = (S.ttsUrl || S.apiUrl || '').replace(/\/$/, '') || 'https://api.siliconflow.cn/v1';
+  const key = S.apiKey;
+  if (!key) { btn.textContent = '🔊 听示范朗读'; btn.disabled = false; alert('请先设置 API Key'); return; }
+
+  fetch(baseUrl + '/audio/speech', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'tts-1', input: text, voice: S.ttsVoice, response_format: 'mp3' })
+  })
+  .then(r => { if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.blob(); })
+  .then(blob => {
+    const url = URL.createObjectURL(blob);
+    audio.src = url;
+    audio.dataset.text = text;
+    audio.onended = () => { btn.textContent = '🔊 听示范朗读'; btn.disabled = false; };
+    audio.play();
+    btn.textContent = '⏸ 暂停';
+    btn.disabled = false;
+  })
+  .catch(e => {
+    btn.textContent = '🔊 听示范朗读';
+    btn.disabled = false;
+    alert('朗读生成失败：' + e.message);
+  });
+}
+
 async function generateHighScore(session) {
   const section = document.getElementById('highscore-section');
   if (!section) return;
@@ -4886,6 +4979,8 @@ function showResult(session, evalText) {
   if (session.optimized) {
     document.getElementById('optimize-text').innerHTML = formatExample(session.optimized);
     document.getElementById('optimize-section').style.display = 'block';
+    const ttsBtn = document.getElementById('optimize-tts-btn');
+    if (ttsBtn) ttsBtn.style.display = S.ttsEnabled ? '' : 'none';
   } else {
     document.getElementById('optimize-section').style.display = 'none';
   }
