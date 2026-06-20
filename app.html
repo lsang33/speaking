@@ -1335,13 +1335,11 @@ input:focus { outline: none; border-color: var(--gold); }
     <input type="text" id="cfg-tts-url" placeholder="留空则用SiliconFlow" autocomplete="off"/>
     <div class="label" style="font-size:10px;">发音人</div>
     <div class="flex gap-6" id="tts-voice-chips">
-      <button class="preset-btn" onclick="setTtsVoice('alloy',this)" style="flex:1;">alloy</button>
-      <button class="preset-btn" onclick="setTtsVoice('echo',this)" style="flex:1;">echo</button>
-      <button class="preset-btn" onclick="setTtsVoice('fable',this)" style="flex:1;">fable</button>
-      <button class="preset-btn" onclick="setTtsVoice('nova',this)" style="flex:1;">nova</button>
-      <button class="preset-btn" onclick="setTtsVoice('shimmer',this)" style="flex:1;">shimmer</button>
+      <button class="preset-btn" onclick="setTtsVoice('FunAudioLLM/CosyVoice2-0.5B:david',this)" style="flex:1;">男声(david)</button>
+      <button class="preset-btn" onclick="setTtsVoice('FunAudioLLM/CosyVoice2-0.5B:anna',this)" style="flex:1;">女声(anna)</button>
+      <button class="preset-btn" onclick="setTtsVoice('fishaudio/fish-speech-1.5:default',this)" style="flex:1;">fish-speech</button>
     </div>
-    <div class="hint" style="font-size:12px;">兼容 OpenAI TTS 格式的 API；发音人为 SiliconFlow 支持的 voice 列表</div>
+    <div class="hint" style="font-size:12px;">模型默认 FunAudioLLM/CosyVoice2-0.5B；使用你的 SiliconFlow Key，不需额外注册</div>
   </div>
 
   <!-- 目标时长 -->
@@ -1763,7 +1761,7 @@ let S = {
   retryCount: 0,
   favIds: JSON.parse(ls('favs') || '[]'),
   ttsUrl: ls('tts_url') || '',
-  ttsVoice: ls('tts_voice') || 'alloy',
+  ttsVoice: ls('tts_voice') || 'FunAudioLLM/CosyVoice2-0.5B:david',
   ttsEnabled: ls('tts_enabled') === '1',
 };
 
@@ -4614,7 +4612,7 @@ function playOptimizeTTS() {
   fetch(baseUrl + '/audio/speech', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'tts-1', input: text, voice: S.ttsVoice, response_format: 'mp3' })
+    body: JSON.stringify({ model: S.ttsVoice.includes('/') ? S.ttsVoice.split(':')[0] : 'tts-1', input: text, voice: S.ttsVoice, response_format: 'mp3' })
   })
   .then(r => { if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.blob(); })
   .then(blob => {
