@@ -585,6 +585,7 @@ input:focus { outline: none; border-color: var(--gold); }
     <div class="flex gap-8">
       <button class="btn btn-ghost" onclick="goHistory()" style="flex:1;">历史</button>
       <button class="btn btn-ghost" onclick="goTopics()" style="flex:1;">题库</button>
+      <button class="btn btn-ghost" onclick="goArchive()" style="flex:1;">档案</button>
     </div>
     <div class="flex gap-8">
       <button class="btn btn-ghost" onclick="goWordReady()" style="flex:1; border:1.5px solid var(--gold); color:var(--gold);">词语串联</button>
@@ -955,22 +956,33 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <div class="topic-card" style="padding:14px 18px;" id="res-topic-display"></div>
 
-  <!-- 一句话建议（轻量，嵌在卡片下方） -->
-  <div id="res-oneliner" style="display:none;font-size:14px;font-weight:600;color:var(--gold);line-height:1.6;padding:0 4px;"></div>
-
   <div id="res-labels"></div>
-
-  <!-- 跟上次比（紧凑一行） -->
-  <div id="res-compare" style="display:none;font-size:13px;color:var(--muted);line-height:1.6;padding:0 4px;"></div>
-
-  <!-- 可引用案例 -->
-  <div id="res-cases" style="display:none;font-size:13px;color:var(--muted);line-height:1.8;padding:8px 12px;background:var(--card2);border-radius:10px;"></div>
 
   <div id="res-metrics"></div>
 
   <div id="res-evals" class="flex col gap-10"></div>
 
-  <div style="background:var(--card); border-radius:var(--r); padding:12px 16px; text-align:center; font-size:13px; color:var(--muted); line-height:1.6;" id="res-cheer"></div>
+  <div style="background:var(--card); border-radius:var(--r); padding:16px; text-align:center; font-size:15px; font-weight:500; color:var(--gold); line-height:1.6;" id="res-cheer"></div>
+
+  <!-- 跟上次比 -->
+  <div id="res-compare" style="display:none;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:14px 16px;">
+    <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px;">📌 跟上次比</div>
+    <div id="res-compare-content" style="font-size:13px;color:var(--muted);line-height:1.7;"></div>
+  </div>
+
+  <!-- 可引用案例 -->
+  <div id="res-cases" style="display:none;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:14px 16px;">
+    <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px;">💡 这道题可以引用</div>
+    <div id="res-cases-content" style="font-size:13px;color:var(--text);line-height:1.7;"></div>
+  </div>
+
+  <!-- 说话节奏 -->
+  <div id="res-rhythm" style="display:none;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:14px 16px;">
+    <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px;">📈 说话节奏</div>
+    <canvas id="rhythm-canvas" style="width:100%;height:140px;border-radius:8px;background:var(--card2);display:block;"></canvas>
+    <canvas id="pace-canvas" style="width:100%;height:60px;border-radius:8px;background:var(--card2);margin-top:6px;display:block;"></canvas>
+    <div id="rhythm-notes" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
+  </div>
 
   <!-- 示范参考 -->
   <div class="example-section" id="example-section">
@@ -1095,12 +1107,10 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
-  <div class="flex col gap-8 mt-auto" style="padding-top:8px;">
-    <button class="btn btn-gold" onclick="retryTopic()" style="width:100%; font-size:16px; padding:16px;">🔄 再练一次</button>
-    <div class="flex gap-8">
-      <button class="btn btn-ghost" onclick="switchTopic()" style="flex:1;">换一道题</button>
-      <button class="btn btn-ghost" onclick="goHome()" style="flex:1;">完成</button>
-    </div>
+  <div class="flex gap-10 mt-auto">
+    <button class="btn btn-ghost" onclick="goHistory()" style="flex:1;">历史</button>
+    <button class="btn btn-ghost" onclick="retryTopic()" style="flex:1;">再来一次</button>
+    <button class="btn btn-gold" onclick="goHome()" style="flex:1;">完成</button>
   </div>
 </div>
 
@@ -1377,6 +1387,34 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
 </div>
 
+<!-- ═══ ARCHIVE ═══ -->
+<div id="s-archive" class="screen flex col gap-14">
+  <div class="flex" style="align-items:center; gap:10px;">
+    <button onclick="goHome()" class="btn btn-ghost btn-sm">← 返回</button>
+    <h2>档案</h2>
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:16px;">
+    <div class="label" style="margin-bottom:10px;">📊 练习分布</div>
+    <div id="archive-distribution"></div>
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:16px;">
+    <div class="label" style="margin-bottom:10px;">🔥 在变好</div>
+    <div id="archive-trends" style="font-size:13px;color:var(--muted);line-height:1.8;"></div>
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:16px;">
+    <div class="label" style="margin-bottom:10px;">🎯 注意到</div>
+    <div id="archive-notices" style="font-size:13px;color:var(--muted);line-height:1.8;"></div>
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:16px;">
+    <div class="label" style="margin-bottom:10px;">🎧 听听自己</div>
+    <div id="archive-recordings" style="font-size:13px;color:var(--muted);"></div>
+  </div>
+</div>
+
 <!-- ═══ TOPICS BANK ═══ -->
 
 <div id="s-topics" class="screen flex col gap-14">
@@ -1647,7 +1685,7 @@ let S = {
   prepTime: parseInt(ls('prep_time') || '30', 10),
   targetDur: ls('target_dur') || '2-3',
   enableOptimize: ls('enable_optimize') !== '0',
-  enableHighScore: ls('enable_highscore') !== '0',
+  enableHighScore: ls('enable_highscore') === '1',
   interviewTwoStage: ls('interview_twostage') === '1',
   enableThinkModel: ls('enable_think_model') === '1',
   evalThinking: ls('eval_thinking') !== '0', // default true
@@ -1678,6 +1716,8 @@ let S = {
   history: [],
   streak: 0,
   noSR: false,
+  lastFeedback: '',
+  retryCount: 0,
 };
 
 /* ═══════════════════════════════════════
@@ -1688,6 +1728,13 @@ function ls(k, v) {
   localStorage.setItem('ks_' + k, v);
 }
 function dateStr(d) { return d.toISOString().slice(0, 10); }
+function findLastSimilarSession(cur) {
+  for (const s of allSessions) {
+    if (s.id === cur.id) continue;
+    if (s.theme === cur.theme || s.mode === cur.mode) return s;
+  }
+  return null;
+}
 function today() { return dateStr(new Date()); }
 function pad(n) { return String(n).padStart(2, '0'); }
 
@@ -1849,33 +1896,20 @@ function switchHomeTopicMode(e) {
 }
 
 function retryTopic() {
-  // Store context before starting countdown — the evaluation prompt will pick it up
-  if (window._retryContext) {
-    S.retryContext = window._retryContext;
+  // 保存本轮反馈，供再次练习时 AI 参考
+  const cheerEl = document.getElementById('res-cheer');
+  const casesEl = document.getElementById('res-cases-content');
+  const compareEl = document.getElementById('res-compare-content');
+  let fb = cheerEl ? cheerEl.textContent : '';
+  if (casesEl && casesEl.textContent.trim()) {
+    fb += ' | 推荐案例：' + casesEl.textContent.trim().replace(/\n/g, ' ');
   }
+  if (compareEl && compareEl.textContent.trim()) {
+    fb += ' | 与上次对比：' + compareEl.textContent.trim().replace(/<br>/g, ' ').replace(/<[^>]+>/g, '');
+  }
+  S.lastFeedback = fb.substring(0, 500); // 限制长度
+  S.retryCount = (S.retryCount || 0) + 1;
   startCountdown();
-}
-
-function switchTopic() {
-  if (S.mode === 'word') {
-    goWordReady();
-    return;
-  }
-  if (S.mode === 'story') {
-    goStorySetup();
-    return;
-  }
-  if (S.mode === 'expansion') {
-    goExpSource();
-    return;
-  }
-  // Free speech / interview mode: pick a new random topic
-  S.mode = 'topic';
-  S.topic = randomTopic();
-  if (S.topic && S.topic.theme === '自由话题') {
-    S.topic.d = 2;
-  }
-  goReady();
 }
 
 function retryHistSession(id) {
@@ -1912,6 +1946,8 @@ function goHome() {
   cancelPrepTimer();
   S.mode = 'topic';
   S.words = [];
+  S.lastFeedback = '';
+  S.retryCount = 0;
   _expState = { source: '', sourceTopic: null, argument: '', directions: [], duration: 90, domain: '', difficulty: 'medium' };
   _expClaimsCache = {};
   _expThemeCache = {};
@@ -2109,6 +2145,136 @@ function setHistFilter(theme) {
   const filtered = theme === 'all' ? allSessions : allSessions.filter(s => s.theme === theme);
   renderHistFilter();
   renderHistList(filtered);
+}
+
+async function renderRhythm(sessionId, duration, metrics, audioMetrics) {
+  const sectionEl = document.getElementById('res-rhythm');
+  if (!sectionEl || duration < 60) { sectionEl && (sectionEl.style.display = 'none'); return; }
+  try {
+    const blob = await getAudio(sessionId);
+    if (!blob) { sectionEl.style.display = 'none'; return; }
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+    const sampleRate = buf.sampleRate;
+    const data = buf.getChannelData(0);
+    const winMs = 200;
+    const winSamples = Math.floor(sampleRate * winMs / 1000);
+    const steps = Math.floor(data.length / winSamples);
+    const envelope = [];
+    for (let i = 0; i < steps; i++) {
+      let sum = 0;
+      const start = i * winSamples;
+      for (let j = 0; j < winSamples; j++) sum += data[start + j] * data[start + j];
+      envelope.push(Math.sqrt(sum / winSamples));
+    }
+    const maxEnv = Math.max(...envelope) || 1;
+    const normEnv = envelope.map(v => v / maxEnv);
+    ctx.close();
+
+    // ── Draw rhythm chart ──
+    const canvas = document.getElementById('rhythm-canvas');
+    if (!canvas) { sectionEl.style.display = 'none'; return; }
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const W = rect.width * dpr, H = 140 * dpr;
+    canvas.width = W; canvas.height = H;
+    canvas.style.width = rect.width + 'px'; canvas.style.height = '140px';
+    const c = canvas.getContext('2d');
+    c.scale(dpr, dpr);
+    const w = rect.width, h = 140, pad = 12;
+    const pw = w - pad * 2, ph = h - pad * 2 - 20;
+
+    // background
+    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card2').trim() || '#eeeef2';
+    c.fillRect(0, 0, w, h);
+
+    // pause markers
+    const pauses = audioMetrics?.pauses || [];
+    const penaltySec = ((parseInt(S.pausePenalty) || 4000) / 1000);
+    const totalSec = duration;
+    pauses.forEach(p => {
+      if (p >= penaltySec) {
+        // approximate position: distribute pauses evenly since we don't have exact times
+      }
+    });
+
+    // envelope curve
+    c.beginPath();
+    c.moveTo(pad, pad + ph);
+    for (let i = 0; i < normEnv.length; i++) {
+      const x = pad + (i / (normEnv.length - 1)) * pw;
+      const y = pad + ph - normEnv[i] * ph;
+      c.lineTo(x, y);
+    }
+    c.lineTo(pad + pw, pad + ph);
+    c.closePath();
+    const goldColor = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() || '#d4a843';
+    c.fillStyle = goldColor + '26';
+    c.fill();
+    c.strokeStyle = goldColor;
+    c.lineWidth = 1.2;
+    c.stroke();
+
+    // time axis
+    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8b8a94';
+    c.font = '10px system-ui';
+    const totalLabelSec = Math.ceil(totalSec / 30) * 30;
+    for (let t = 0; t <= totalLabelSec; t += 30) {
+      const x = pad + (t / totalSec) * pw;
+      if (x <= pad + pw) { c.fillText(t + 's', x - 10, h - 4); }
+    }
+
+    // top stats
+    c.fillStyle = goldColor;
+    c.font = 'bold 10px system-ui';
+    c.fillText(`${metrics.chars || 0}字 · ${metrics.totalFillers || 0}口头禅 · ${audioMetrics?.pauseCount || 0}停顿`, pad, pad + 10);
+
+    // ── Draw pace chart ──
+    const canvas2 = document.getElementById('pace-canvas');
+    if (!canvas2) { sectionEl.style.display = 'none'; return; }
+    const rect2 = canvas2.getBoundingClientRect();
+    const W2 = rect2.width * dpr, H2 = 60 * dpr;
+    canvas2.width = W2; canvas2.height = H2;
+    canvas2.style.width = rect2.width + 'px'; canvas2.style.height = '60px';
+    const c2 = canvas2.getContext('2d');
+    c2.scale(dpr, dpr);
+    const w2 = rect2.width, h2 = 60;
+    const segments = 6;
+    const segW = (w2 - pad * 2) / segments;
+    const segSec = totalSec / segments;
+    const charsPerSeg = (metrics.chars || 1) / segments;
+    c2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card2').trim() || '#eeeef2';
+    c2.fillRect(0, 0, w2, h2);
+    const maxPace = Math.max(charsPerSeg / (segSec / 60), 100);
+    for (let i = 0; i < segments; i++) {
+      const segPace = charsPerSeg / (segSec / 60);
+      const barH = Math.min((segPace / (maxPace * 1.2)) * (h2 - 20 - pad), h2 - 20 - pad);
+      const x = pad + i * segW;
+      c2.fillStyle = segPace > 320 ? 'var(--red)' : segPace > 290 ? 'var(--warn)' : segPace < 140 ? 'var(--red)' : 'var(--green)';
+      c2.globalAlpha = 0.6;
+      c2.fillRect(x + 2, pad + (h2 - 20 - pad) - barH, segW - 4, barH);
+      c2.globalAlpha = 1;
+      c2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8b8a94';
+      c2.font = '9px system-ui';
+      c2.fillText(Math.round(segPace), x + segW / 2 - 14, pad + (h2 - 20 - pad) - barH - 3);
+    }
+
+    // ── Notes ──
+    const notesEl = document.getElementById('rhythm-notes');
+    if (notesEl) {
+      const longestSegment = Math.max(...Array(segments).fill(0).map((_, i) => charsPerSeg / (segSec / 60)));
+      const hasLongNoStop = audioMetrics?.longestPause > penaltySec;
+      notesEl.innerHTML =
+        `· 最长连续无停顿段落约 ${Math.round(segSec)} 秒<br>` +
+        `· 停顿 ${audioMetrics?.pauseCount || 0} 次（卡顿 ${audioMetrics?.pauses?.filter(p => p >= penaltySec).length || 0} 次）<br>` +
+        `· 最快段 ${Math.round(longestSegment)} 字/分 · 音量变化 ${audioMetrics?.volumeCV ? (audioMetrics.volumeCV < 0.25 ? '较单调' : audioMetrics.volumeCV < 0.5 ? '有起伏' : '变化丰富') : '—'}`;
+    }
+
+    sectionEl.style.display = 'block';
+  } catch (e) {
+    console.log('renderRhythm error:', e);
+    sectionEl.style.display = 'none';
+  }
 }
 
 function highlightSlips(transcript, evaluation, metrics) {
@@ -3700,7 +3866,7 @@ function startSR() {
   }
   const r = new SR();
   r.lang = 'zh-CN';
-  r.continuous = true;
+  r.continuous = false;
   r.interimResults = true;
   let final = S.transcript;
 
@@ -4001,14 +4167,10 @@ ${transcriptLabel}
 
 **展开示范**：[为同一论点写一段高质量的展开示范，200-300字，有逻辑层次，有具体举例，有专业词汇，让学员可以对比学习]
 
-**可引用案例**：[针对本题论点，推荐2个具体的、真实的案例或数据，每个一行，格式为"· 案例名称或数据：一句话说明如何用于本题"。如没有找到可靠案例，写"无"]
-
-**一句话**：[一条具体可操作的建议，格式为"你可以……"，不超过20字]
-
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因]
 **鼓励**：[一句话，不超过15字]
-**明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}`;
+**明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}\n**可引用案例**：[根据本题论点推荐2-3个真实案例或数据，每条不超过40字。不确定真实性的不要推荐。格式：- 案例名：一句话说明]`;
   } else if (mode === 'word') {
     // ── 词语串联模式 ──
     const wordList = words.join('、');
@@ -4054,12 +4216,10 @@ ${transcriptLabel}
 **语言流畅度**：[结合口头禅和停顿数据评价，停顿过多或有长停顿须指出]
 
 **明日聚焦**：[下次串联可尝试的一个具体技巧]${slipSection}
-
-**一句话**：[一条具体可操作的建议，格式为"你可以……"，不超过20字]
-
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
+**可引用案例**：[根据指定词语主题推荐2-3个可引用的真实案例或数据，每条不超过40字。格式：- 案例名：一句话说明]
 `;
   } else if (mode === 'story') {
     // ── 讲述模式模式 ──
@@ -4102,12 +4262,10 @@ ${transcriptLabel}
 **语言流畅度**：[结合口头禅和停顿数据评价，节奏是否自然]
 
 **明日聚焦**：[下次讲述模式最应加强的一点，给出具体做法]${slipSection}
-
-**一句话**：[一条具体可操作的建议，格式为"你可以……"，不超过20字]
-
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
+**可引用案例**：[根据故事主题推荐2-3个可引用的真实案例或数据，每条不超过40字。格式：- 案例名：一句话说明]
 `;
   } else {
     // ── 普通题目模式 ──
@@ -4147,31 +4305,16 @@ ${transcriptLabel}
 **语言流畅度**：[结合口头禅和停顿数据评价，口头禅点名，长停顿须指出]
 
 **明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}
-
-**可引用案例**：[针对本题主题，推荐2个具体的、真实的案例或数据，每个一行，格式为"· 案例名称或数据：一句话说明如何用于本题"。如没有找到可靠案例，写"无"]
-
-**一句话**：[一条具体可操作的建议，格式为"你可以……"，不超过20字]
-
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
+**可引用案例**：[根据题目主题推荐2-3个可引用的真实案例或数据，每条不超过40字。格式：- 案例名：一句话说明]
 `;
   }
 
-  // If this is a retry, add context from the previous attempt
-  if (S.retryContext && S.retryContext.prevEvalText) {
-    const rc = S.retryContext;
-    let retryNote = '\n【这是第二次练习——学员刚看过一次反馈】\n';
-    retryNote += '上次得分：' + rc.prevScore + '/10。\n';
-    if (rc.compareSummary) {
-      retryNote += '上次对比：' + rc.compareSummary.replace(/<br>/g, '；') + '\n';
-    }
-    if (rc.casesText) {
-      retryNote += '上次推荐的案例：' + rc.casesText.replace(/<br>/g, '；') + '\n';
-    }
-    retryNote += '请在点评中对比两次练习的变化。如果学员有意识地使用了上次提示的内容，请特别表扬。\n';
-    prompt = retryNote + '\n' + prompt;
-    S.retryContext = null; // clear after use
+  // ── 上下文：同一道题的再次练习 ──
+  if (S.lastFeedback) {
+    prompt += `\n\n## ⚠️ 注意：用户这是对同一道题的第${S.retryCount}次练习\n上一轮AI反馈：${S.lastFeedback}\n请关注用户是否根据反馈做出了改进，并在评语中提及变化（进步了还是没变化）。`;
   }
 
   try {
@@ -4377,7 +4520,6 @@ async function generateHighScore(session) {
   const section = document.getElementById('highscore-section');
   if (!section) return;
   section.style.display = 'block';
-  document.getElementById('highscore-expanded').style.display = 'block';
   const styleEl = document.getElementById('highscore-style-chips');
   if (styleEl) styleEl.style.display = 'flex';
   // 初始提示，等用户选风格后再生成
@@ -4465,56 +4607,6 @@ ${session.transcript}
 /* ═══════════════════════════════════════
    RESULT
 ═══════════════════════════════════════ */
-function findSimilarSession(current) {
-  const all = allSessions.filter(s => s.id !== current.id);
-  if (!all.length) return { prev: null, summary: '' };
-
-  // Try same theme first
-  let prev = all.find(s => s.theme === current.theme);
-  // If no same theme, try same mode
-  if (!prev) prev = all.find(s => s.mode === current.mode);
-  // Fallback: most recent
-  if (!prev) prev = all[0];
-  if (!prev) return { prev: null, summary: '' };
-
-  const cm = current.metrics || {};
-  const pm = prev.metrics || {};
-  const durNow = Math.floor((current.duration || 0) / 60);
-  const durPrev = Math.floor((prev.duration || 0) / 60);
-
-  let lines = [];
-  lines.push('上次同类练习：' + prev.date);
-
-  if (pm.totalFillers !== undefined && cm.totalFillers !== undefined) {
-    const diff = cm.totalFillers - pm.totalFillers;
-    if (diff < 0) lines.push('填充词从 ' + pm.totalFillers + ' → ' + cm.totalFillers + ' 次（少了 ' + Math.abs(diff) + ' 次 ↘）');
-    else if (diff > 0) lines.push('填充词从 ' + pm.totalFillers + ' → ' + cm.totalFillers + ' 次（多了 ' + diff + ' 次，注意一下）');
-    else lines.push('填充词都是 ' + cm.totalFillers + ' 次，保持住了');
-  }
-
-  if (pm.pace && cm.pace) {
-    const paceDiff = cm.pace - pm.pace;
-    if (Math.abs(paceDiff) > 10) {
-      lines.push('语速从 ' + pm.pace + ' → ' + cm.pace + ' 字/分钟' + (paceDiff < 0 ? '（更稳了）' : '（偏快了）'));
-    }
-  }
-
-  if (durNow && durPrev && Math.abs(durNow - durPrev) >= 1) {
-    lines.push('时长从 ' + durPrev + '分 → ' + durNow + '分' + (durNow > durPrev ? '（更长了）' : ''));
-  }
-
-  // If previous had a good score, mention it
-  if (prev.evaluation) {
-    const prevScoreM = prev.evaluation.match(/\*\*评分\*\*[：:]\s*(\d+)/);
-    const prevScore = prevScoreM ? parseInt(prevScoreM[1]) : 0;
-    if (prevScore >= 7) {
-      lines.push('那次你的回答里有好东西，可以回想一下那次是怎么说的');
-    }
-  }
-
-  return { prev, summary: lines.join('<br>') };
-}
-
 function showResult(session, evalText) {
   computeStreak();
   document.getElementById('res-score').textContent = session.score;
@@ -4523,16 +4615,6 @@ function showResult(session, evalText) {
   document.getElementById('res-topic-display').innerHTML =
     `<div class="label" style="margin-bottom:6px;">${session.theme}</div>
      <div style="font-size:15px;font-weight:500;line-height:1.5;">${session.topic}</div>`;
-
-  // 跟上次比（紧凑一行）
-  const cmpDiv = document.getElementById('res-compare');
-  const cmp = findSimilarSession(session);
-  if (cmp.prev && cmp.summary) {
-    cmpDiv.innerHTML = '📌 ' + cmp.summary;
-    cmpDiv.style.display = '';
-  } else {
-    cmpDiv.style.display = 'none';
-  }
 
   document.getElementById('res-labels').innerHTML = session.labels
     ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
@@ -4692,37 +4774,53 @@ function showResult(session, evalText) {
   const cm = evalText.match(/\*\*鼓励\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   document.getElementById('res-cheer').textContent = cm ? cm[1].trim() : '继续坚持，每天进步一点点。';
 
-  // 一句话建议
-  const oneDiv = document.getElementById('res-oneliner');
-  const oneM = evalText.match(/\*\*一句话\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
-  if (oneM && oneM[1].trim()) {
-    oneDiv.textContent = '💡 ' + oneM[1].trim();
-    oneDiv.style.display = '';
+  // ── 跟上次比 ──
+  const prevSession = findLastSimilarSession(session);
+  const compareEl = document.getElementById('res-compare');
+  const compareContent = document.getElementById('res-compare-content');
+  if (prevSession) {
+    const prevFillerRate = prevSession.metrics && prevSession.duration
+      ? (prevSession.metrics.totalFillers / (prevSession.duration / 60)).toFixed(1)
+      : '?';
+    const curFillerRate = session.metrics && session.duration
+      ? (session.metrics.totalFillers / (session.duration / 60)).toFixed(1)
+      : '?';
+    const prevPace = prevSession.metrics ? prevSession.metrics.pace : '?';
+    const curPace = session.metrics ? session.metrics.pace : '?';
+    const prevDur = prevSession.duration || 0;
+    const curDur = session.duration || 0;
+    const fillerTrend = prevFillerRate !== '?' && curFillerRate !== '?'
+      ? (parseFloat(curFillerRate) < parseFloat(prevFillerRate) ? '↘ 减少了' : parseFloat(curFillerRate) > parseFloat(prevFillerRate) ? '↗ 增加了' : '→ 持平')
+      : '';
+    const paceTrend = prevPace !== '?' && curPace !== '?'
+      ? (Math.abs(curPace - prevPace) <= 20 ? '→ 稳定' : curPace > prevPace ? '↗ 更快了' : '↘ 更稳了')
+      : '';
+    const durTrend = Math.abs(curDur - prevDur) <= 15 ? '→ 差不多' : curDur > prevDur ? '↗ 说得更久了' : '↘ 更精炼了';
+    compareContent.innerHTML =
+      `上次同类练习：${prevSession.date}（${prevSession.mode === 'expansion' ? '论点展开' : prevSession.mode === 'word' ? '词语串联' : prevSession.mode === 'story' ? '讲述模式' : prevSession.theme}）<br>` +
+      `· 填充词频率：${prevFillerRate}次/分 → ${curFillerRate}次/分 ${fillerTrend}<br>` +
+      `· 语速：${prevPace}字/分 → ${curPace}字/分 ${paceTrend}<br>` +
+      `· 时长：${Math.floor(prevDur/60)}分${prevDur%60}秒 → ${Math.floor(curDur/60)}分${curDur%60}秒 ${durTrend}`;
+    compareEl.style.display = 'block';
   } else {
-    const tm2 = session.metrics;
-    if (tm2 && tm2.totalFillers > 3) {
-      oneDiv.textContent = '💡 试着放慢一点，每说完一个观点停一拍';
-    } else if (session.duration && session.duration < 90) {
-      oneDiv.textContent = '💡 试着说满2分钟，给每个观点多留一句话';
-    } else {
-      oneDiv.textContent = '💡 把这个话题记下来，下周再练一次';
-    }
-    oneDiv.style.display = '';
+    compareEl.style.display = 'none';
   }
 
-  // 可引用案例
-  const casesDiv = document.getElementById('res-cases');
-  const casesM = evalText.match(/\*\*可引用案例\*\*[：:]([\s\S]*?)(?=\*\*评分\*\*|$)/);
+  // ── 可引用案例 ──
+  const casesEl = document.getElementById('res-cases');
+  const casesContent = document.getElementById('res-cases-content');
+  const casesM = evalText.match(/\*\*可引用案例\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   if (casesM) {
     const raw = casesM[1].trim();
-    if (raw && raw !== '无' && raw !== '无。') {
-      casesDiv.innerHTML = '💡 <b>这道题可以引用的</b><br>' + raw.replace(/\n/g, '<br>');
-      casesDiv.style.display = '';
+    const items = raw.split('\n').filter(l => l.trim()).map(l => l.replace(/^[\s·\-\*\d]+[.\s]*/, '').trim());
+    if (items.length && items[0] !== '无') {
+      casesContent.innerHTML = items.map(s => `<div style="margin-bottom:4px;">· ${s}</div>`).join('');
+      casesEl.style.display = 'block';
     } else {
-      casesDiv.style.display = 'none';
+      casesEl.style.display = 'none';
     }
   } else {
-    casesDiv.style.display = 'none';
+    casesEl.style.display = 'none';
   }
 
   // 重置调试面板
@@ -4801,20 +4899,8 @@ function showResult(session, evalText) {
   const topicSaveBtn = document.getElementById('example-topic-save-btn');
   if (topicSaveBtn) { topicSaveBtn.textContent = '存到题目'; topicSaveBtn.style.color = 'var(--muted)'; topicSaveBtn.style.borderColor = 'var(--border-light)'; }
 
-  // Store retry context for context-aware second attempt
-  window._retryContext = {
-    prevEvalText: evalText || '',
-    prevScore: session.score || '—',
-    prevTranscript: session.transcript || '',
-  };
-  const casesEl = document.getElementById('res-cases');
-  if (casesEl && casesEl.textContent.trim()) {
-    window._retryContext.casesText = casesEl.textContent.trim();
-  }
-  const compareEl = document.getElementById('res-compare');
-  if (compareEl && compareEl.textContent.trim()) {
-    window._retryContext.compareSummary = compareEl.textContent.trim();
-  }
+  // ── 节奏可视化 ──
+  renderRhythm(session.id, session.duration, session.metrics, session.audioMetrics);
 
   show('s-result');
 }
@@ -5516,6 +5602,126 @@ function clearTopicsSearch() {
   const inp = document.getElementById('topics-search');
   if (inp) inp.value = '';
   renderTopicsPage();
+}
+
+function goArchive() {
+  renderArchive();
+  show('s-archive');
+}
+
+function renderArchive() {
+  const total = allSessions.length;
+  if (!total) {
+    document.getElementById('archive-distribution').innerHTML = '<div class="muted" style="font-size:13px;">还没有练习记录。开始第一次练习吧。</div>';
+    document.getElementById('archive-trends').innerHTML = '';
+    document.getElementById('archive-notices').innerHTML = '';
+    document.getElementById('archive-recordings').innerHTML = '';
+    return;
+  }
+
+  // ── 练习分布 ──
+  const modeCount = {};
+  const modeNames = { topic: '自由话题', word: '词语串联', story: '讲述模式', expansion: '论点展开' };
+  allSessions.forEach(s => { const m = s.mode || 'topic'; modeCount[m] = (modeCount[m] || 0) + 1; });
+  const maxCount = Math.max(...Object.values(modeCount), 1);
+  const distHtml = Object.entries(modeNames).map(([k, name]) => {
+    const cnt = modeCount[k] || 0;
+    const pct = Math.round(cnt / total * 100);
+    const barW = Math.round(cnt / maxCount * 100);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <span style="font-size:12px;width:60px;flex-shrink:0;color:var(--muted);">${name}</span>
+      <div style="flex:1;height:18px;background:var(--card2);border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:${barW}%;background:var(--gold);border-radius:4px;opacity:0.7;"></div>
+      </div>
+      <span style="font-size:11px;color:var(--muted);width:50px;text-align:right;">${cnt}次 ${pct}%</span>
+    </div>`;
+  }).join('');
+  document.getElementById('archive-distribution').innerHTML = distHtml;
+
+  // ── 在变好 ──
+  const byMonth = {};
+  allSessions.forEach(s => {
+    const month = s.date ? s.date.slice(0, 7) : '未知';
+    if (!byMonth[month]) byMonth[month] = { sessions: [], totalFillers: 0, totalPace: 0, totalDur: 0 };
+    byMonth[month].sessions.push(s);
+    if (s.metrics) {
+      byMonth[month].totalFillers += s.metrics.totalFillers || 0;
+      byMonth[month].totalPace += s.metrics.pace || 0;
+    }
+    byMonth[month].totalDur += s.duration || 0;
+  });
+  const months = Object.keys(byMonth).sort();
+  let trendsHtml = '';
+  if (months.length >= 2) {
+    const first = byMonth[months[0]], last = byMonth[months[months.length - 1]];
+    const firstCount = first.sessions.length, lastCount = last.sessions.length;
+    const firstFillerRate = firstCount ? (first.totalFillers / firstCount).toFixed(1) : '?';
+    const lastFillerRate = lastCount ? (last.totalFillers / lastCount).toFixed(1) : '?';
+    const firstAvgPace = firstCount ? Math.round(first.totalPace / firstCount) : '?';
+    const lastAvgPace = lastCount ? Math.round(last.totalPace / lastCount) : '?';
+    const firstAvgDur = firstCount ? Math.round(first.totalDur / firstCount) : 0;
+    const lastAvgDur = lastCount ? Math.round(last.totalDur / lastCount) : 0;
+    trendsHtml += `<div style="margin-bottom:8px;">· 每次平均填充词：${firstFillerRate}次 → ${lastFillerRate}次 ` +
+      (firstFillerRate !== '?' && lastFillerRate !== '?' && parseFloat(lastFillerRate) < parseFloat(firstFillerRate) ? '↘ 在减少' : parseFloat(lastFillerRate) > parseFloat(firstFillerRate) ? '↗ 在增加' : '→ 持平') + '</div>';
+    trendsHtml += `<div style="margin-bottom:8px;">· 平均语速：${firstAvgPace}字/分 → ${lastAvgPace}字/分 ` +
+      (firstAvgPace !== '?' && lastAvgPace !== '?' && Math.abs(lastAvgPace - firstAvgPace) <= 15 ? '→ 稳定' : lastAvgPace > firstAvgPace ? '↗ 更快了' : '↘ 更稳了') + '</div>';
+    trendsHtml += `<div style="margin-bottom:8px;">· 平均时长：${Math.floor(firstAvgDur/60)}分${firstAvgDur%60}秒 → ${Math.floor(lastAvgDur/60)}分${lastAvgDur%60}秒 ` +
+      (lastAvgDur > firstAvgDur ? '↗ 更久了' : lastAvgDur < firstAvgDur ? '↘ 更精炼了' : '→ 持平') + '</div>';
+    trendsHtml += `<div style="font-size:11px;color:var(--muted-extra);">${months[0]} → ${months[months.length-1]} · 共 ${total} 次练习</div>`;
+  } else {
+    trendsHtml = '<div class="muted" style="font-size:13px;">多练几次就能看到趋势了。</div>';
+  }
+  document.getElementById('archive-trends').innerHTML = trendsHtml;
+
+  // ── 注意到 ──
+  const allScored = allSessions.filter(s => parseInt(s.score));
+  let noticesHtml = '';
+  if (allScored.length >= 3) {
+    const avgScore = (allScored.reduce((a, s) => a + parseInt(s.score), 0) / allScored.length).toFixed(1);
+    const recent5 = allScored.slice(0, Math.min(5, allScored.length));
+    const recentAvg = (recent5.reduce((a, s) => a + parseInt(s.score), 0) / recent5.length).toFixed(1);
+    const scoreTrend = parseFloat(recentAvg) > parseFloat(avgScore) ? '近5次高于平均水平' : parseFloat(recentAvg) < parseFloat(avgScore) ? '近5次略低于平均' : '近5次与平均持平';
+    noticesHtml += `<div style="margin-bottom:6px;">· 平均分 ${avgScore} / 近5次 ${recentAvg} — ${scoreTrend}</div>`;
+    // most used filler
+    const fillerMap = {};
+    allSessions.forEach(s => {
+      if (s.metrics?.fillerCounts) Object.entries(s.metrics.fillerCounts).forEach(([w, c]) => { fillerMap[w] = (fillerMap[w] || 0) + c; });
+    });
+    const topFiller = Object.entries(fillerMap).sort((a, b) => b[1] - a[1])[0];
+    if (topFiller) noticesHtml += `<div style="margin-bottom:6px;">· 最常出现的口头禅：「${topFiller[0]}」共 ${topFiller[1]} 次</div>`;
+    // mode with highest avg score
+    const modeScores = {};
+    allScored.forEach(s => { const m = s.mode || 'topic'; if (!modeScores[m]) modeScores[m] = []; modeScores[m].push(parseInt(s.score)); });
+    const bestMode = Object.entries(modeScores).sort((a, b) => (b[1].reduce((x, y) => x + y, 0) / b[1].length) - (a[1].reduce((x, y) => x + y, 0) / a[1].length))[0];
+    if (bestMode) noticesHtml += `<div>· 得分最高的模式：${modeNames[bestMode[0]] || bestMode[0]}（均分 ${(bestMode[1].reduce((x, y) => x + y, 0) / bestMode[1].length).toFixed(1)}）</div>`;
+  } else {
+    noticesHtml = '<div class="muted" style="font-size:13px;">多练几次就能看到特点了。</div>';
+  }
+  document.getElementById('archive-notices').innerHTML = noticesHtml;
+
+  // ── 听听自己 ──
+  const sessionsWithAudio = allSessions.filter(s => s.asrType); // has audio
+  if (sessionsWithAudio.length >= 2) {
+    const firstRec = sessionsWithAudio[sessionsWithAudio.length - 1]; // oldest
+    const lastRec = sessionsWithAudio[0]; // newest
+    document.getElementById('archive-recordings').innerHTML =
+      `<div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">最早的录音</div>
+          <div style="font-size:12px;margin-bottom:6px;">${firstRec.date} · ${firstRec.topic?.slice(0, 20) || '—'}</div>
+          <button class="btn btn-ghost btn-sm" onclick="toggleAudio('${firstRec.id}')">▶ 播放</button>
+          <audio id="ael-${firstRec.id}" style="display:none;"></audio>
+        </div>
+        <div style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">最近的录音</div>
+          <div style="font-size:12px;margin-bottom:6px;">${lastRec.date} · ${lastRec.topic?.slice(0, 20) || '—'}</div>
+          <button class="btn btn-ghost btn-sm" onclick="toggleAudio('${lastRec.id}')">▶ 播放</button>
+          <audio id="ael-${lastRec.id}" style="display:none;"></audio>
+        </div>
+      </div>`;
+  } else {
+    document.getElementById('archive-recordings').innerHTML = '<div class="muted" style="font-size:13px;">再多录几次就能对比了。</div>';
+  }
 }
 
 function goTopics() {
