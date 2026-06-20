@@ -964,24 +964,26 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <div style="background:var(--card); border-radius:var(--r); padding:16px; text-align:center; font-size:15px; font-weight:500; color:var(--gold); line-height:1.6;" id="res-cheer"></div>
 
-  <!-- 跟上次比 -->
-  <div id="res-compare" style="display:none;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:14px 16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px;">📌 跟上次比</div>
-    <div id="res-compare-content" style="font-size:13px;color:var(--muted);line-height:1.7;"></div>
-  </div>
+  <!-- 反思与改进：跟上次比 + 可引用案例 + 说话节奏 -->
+  <div id="res-improve" style="display:block;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:14px 16px;">
+    <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px;">🔄 反思与改进</div>
 
-  <!-- 可引用案例 -->
-  <div id="res-cases" style="display:none;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:14px 16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px;">💡 这道题可以引用</div>
-    <div id="res-cases-content" style="font-size:13px;color:var(--text);line-height:1.7;"></div>
-  </div>
+    <div id="res-compare" style="display:none;">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">📌 跟上次比</div>
+      <div id="res-compare-content" style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:10px;"></div>
+    </div>
 
-  <!-- 说话节奏 -->
-  <div id="res-rhythm" style="display:none;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:14px 16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px;">📈 说话节奏</div>
-    <canvas id="rhythm-canvas" style="width:100%;height:140px;border-radius:8px;background:var(--card2);display:block;"></canvas>
-    <canvas id="pace-canvas" style="width:100%;height:60px;border-radius:8px;background:var(--card2);margin-top:6px;display:block;"></canvas>
-    <div id="rhythm-notes" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
+    <div id="res-cases" style="display:none;">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">💡 这道题可以引用</div>
+      <div id="res-cases-content" style="font-size:13px;color:var(--text);line-height:1.7;margin-bottom:10px;"></div>
+    </div>
+
+    <div id="res-rhythm" style="display:block;">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">📈 说话节奏</div>
+      <canvas id="rhythm-canvas" style="width:100%;height:140px;border-radius:8px;background:var(--card2);display:block;"></canvas>
+      <canvas id="pace-canvas" style="width:100%;height:60px;border-radius:8px;background:var(--card2);margin-top:6px;display:block;"></canvas>
+      <div id="rhythm-notes" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
+    </div>
   </div>
 
   <!-- 示范参考 -->
@@ -2149,7 +2151,8 @@ function setHistFilter(theme) {
 
 async function renderRhythm(sessionId, duration, metrics, audioMetrics) {
   const sectionEl = document.getElementById('res-rhythm');
-  if (!sectionEl || duration < 10) { sectionEl && (sectionEl.style.display = 'none'); return; }
+  if (!sectionEl) return;
+  sectionEl.style.display = 'block';
   try {
     const blob = await getAudio(sessionId);
     if (!blob) { sectionEl.style.display = 'none'; return; }
@@ -2267,7 +2270,8 @@ async function renderRhythm(sessionId, duration, metrics, audioMetrics) {
       notesEl.innerHTML =
         `· 最长连续无停顿段落约 ${Math.round(segSec)} 秒<br>` +
         `· 停顿 ${audioMetrics?.pauseCount || 0} 次（卡顿 ${audioMetrics?.pauses?.filter(p => p >= penaltySec).length || 0} 次）<br>` +
-        `· 最快段 ${Math.round(longestSegment)} 字/分 · 音量变化 ${audioMetrics?.volumeCV ? (audioMetrics.volumeCV < 0.25 ? '较单调' : audioMetrics.volumeCV < 0.5 ? '有起伏' : '变化丰富') : '—'}`;
+        `· 最快段 ${Math.round(longestSegment)} 字/分 · 音量变化 ${audioMetrics?.volumeCV ? (audioMetrics.volumeCV < 0.25 ? '较单调' : audioMetrics.volumeCV < 0.5 ? '有起伏' : '变化丰富') : '—'}` +
+        (duration < 60 ? '<br><span style="color:var(--gold);">💡 当前录音不足 60 秒，节奏分析仅供参考。</span>' : '');
     }
 
     sectionEl.style.display = 'block';
