@@ -4536,14 +4536,14 @@ function showResult(session, evalText) {
      <div style="font-size:15px;font-weight:500;line-height:1.5;">${session.topic}</div>`;
 
   // Show comparison with previous practice
-  const compareDiv = document.getElementById('res-compare');
-  const compareText = document.getElementById('res-compare-text');
+  const cmpDiv = document.getElementById('res-compare');
+  const cmpText = document.getElementById('res-compare-text');
   const cmp = findSimilarSession(session);
   if (cmp.prev && cmp.summary) {
-    compareText.innerHTML = cmp.summary;
-    compareDiv.style.display = '';
+    cmpText.innerHTML = cmp.summary;
+    cmpDiv.style.display = '';
   } else {
-    compareDiv.style.display = 'none';
+    cmpDiv.style.display = 'none';
   }
 
   document.getElementById('res-labels').innerHTML = session.labels
