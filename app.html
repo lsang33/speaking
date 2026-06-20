@@ -1107,10 +1107,12 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
-  <div class="flex gap-10 mt-auto">
-    <button class="btn btn-ghost" onclick="goHistory()" style="flex:1;">历史</button>
-    <button class="btn btn-ghost" onclick="retryTopic()" style="flex:1;">再来一次</button>
-    <button class="btn btn-gold" onclick="goHome()" style="flex:1;">完成</button>
+  <div class="flex col gap-8 mt-auto" style="padding-top:8px;">
+    <button class="btn btn-gold" onclick="retryTopic()" style="width:100%; font-size:16px; padding:16px;">🔄 再练一次</button>
+    <div class="flex gap-8">
+      <button class="btn btn-ghost" onclick="switchTopic()" style="flex:1;">换一道题</button>
+      <button class="btn btn-ghost" onclick="goHome()" style="flex:1;">完成</button>
+    </div>
   </div>
 </div>
 
@@ -1859,7 +1861,33 @@ function switchHomeTopicMode(e) {
 }
 
 function retryTopic() {
+  // Store context before starting countdown — the evaluation prompt will pick it up
+  if (window._retryContext) {
+    S.retryContext = window._retryContext;
+  }
   startCountdown();
+}
+
+function switchTopic() {
+  if (S.mode === 'word') {
+    goWordReady();
+    return;
+  }
+  if (S.mode === 'story') {
+    goStorySetup();
+    return;
+  }
+  if (S.mode === 'expansion') {
+    goExpSource();
+    return;
+  }
+  // Free speech / interview mode: pick a new random topic
+  S.mode = 'topic';
+  S.topic = randomTopic();
+  if (S.topic && S.topic.theme === '自由话题') {
+    S.topic.d = 2;
+  }
+  goReady();
 }
 
 function retryHistSession(id) {
@@ -4142,6 +4170,22 @@ ${transcriptLabel}
 `;
   }
 
+  // If this is a retry, add context from the previous attempt
+  if (S.retryContext && S.retryContext.prevEvalText) {
+    const rc = S.retryContext;
+    let retryNote = '\n【这是第二次练习——学员刚看过一次反馈】\n';
+    retryNote += '上次得分：' + rc.prevScore + '/10。\n';
+    if (rc.compareSummary) {
+      retryNote += '上次对比：' + rc.compareSummary.replace(/<br>/g, '；') + '\n';
+    }
+    if (rc.casesText) {
+      retryNote += '上次推荐的案例：' + rc.casesText.replace(/<br>/g, '；') + '\n';
+    }
+    retryNote += '请在点评中对比两次练习的变化。如果学员有意识地使用了上次提示的内容，请特别表扬。\n';
+    prompt = retryNote + '\n' + prompt;
+    S.retryContext = null; // clear after use
+  }
+
   try {
     S.debugLastPrompt = prompt;
     S.debugLastResponse = '';
@@ -4771,6 +4815,21 @@ function showResult(session, evalText) {
   variantSection.style.display = session.theme === '结构化面试' ? 'block' : 'none';
   const topicSaveBtn = document.getElementById('example-topic-save-btn');
   if (topicSaveBtn) { topicSaveBtn.textContent = '存到题目'; topicSaveBtn.style.color = 'var(--muted)'; topicSaveBtn.style.borderColor = 'var(--border-light)'; }
+
+  // Store retry context for context-aware second attempt
+  window._retryContext = {
+    prevEvalText: evalText || '',
+    prevScore: session.score || '—',
+    prevTranscript: session.transcript || '',
+  };
+  const casesEl = document.getElementById('res-cases-text');
+  if (casesEl && casesEl.textContent.trim()) {
+    window._retryContext.casesText = casesEl.textContent.trim();
+  }
+  const compareEl = document.getElementById('res-compare-text');
+  if (compareEl && compareEl.textContent.trim()) {
+    window._retryContext.compareSummary = compareEl.textContent.trim();
+  }
 
   show('s-result');
 }
