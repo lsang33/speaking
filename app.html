@@ -955,6 +955,14 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
   </div>
 
+  <!-- 可引用案例 -->
+  <div id="res-cases" style="display:none;">
+    <div style="background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;">
+      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px;">💡 这道题可以引用的</div>
+      <div id="res-cases-text" style="font-size:14px;color:var(--text);line-height:1.8;"></div>
+    </div>
+  </div>
+
   <!-- 论点展开：词汇升级 + 展开对比 -->
   <div id="exp-result-section" style="display:none;">
     <div id="exp-vocab-upgrade" class="card" style="margin-bottom:10px;"></div>
@@ -962,6 +970,11 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
 
   <div class="topic-card" style="padding:14px 18px;" id="res-topic-display"></div>
+
+  <!-- 一句话建议 -->
+  <div id="res-oneliner" style="display:none;background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;text-align:center;">
+    <div style="font-size:14px;font-weight:600;color:var(--gold);line-height:1.6;" id="res-oneliner-text"></div>
+  </div>
 
   <div id="res-labels"></div>
 
@@ -3972,6 +3985,10 @@ ${transcriptLabel}
 
 **展开示范**：[为同一论点写一段高质量的展开示范，200-300字，有逻辑层次，有具体举例，有专业词汇，让学员可以对比学习]
 
+**可引用案例**：[针对本题论点，推荐2个具体的、真实的案例或数据，每个一行，格式为"· 案例名称或数据：一句话说明如何用于本题"。如没有找到可靠案例，写"无"]
+
+**一句话**：[一条具体可操作的建议，格式为"你可以……"，不超过20字]
+
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因]
 **鼓励**：[一句话，不超过15字]
@@ -4021,6 +4038,9 @@ ${transcriptLabel}
 **语言流畅度**：[结合口头禅和停顿数据评价，停顿过多或有长停顿须指出]
 
 **明日聚焦**：[下次串联可尝试的一个具体技巧]${slipSection}
+
+**一句话**：[一条具体可操作的建议，格式为"你可以……"，不超过20字]
+
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
@@ -4066,6 +4086,9 @@ ${transcriptLabel}
 **语言流畅度**：[结合口头禅和停顿数据评价，节奏是否自然]
 
 **明日聚焦**：[下次讲述模式最应加强的一点，给出具体做法]${slipSection}
+
+**一句话**：[一条具体可操作的建议，格式为"你可以……"，不超过20字]
+
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
@@ -4108,6 +4131,11 @@ ${transcriptLabel}
 **语言流畅度**：[结合口头禅和停顿数据评价，口头禅点名，长停顿须指出]
 
 **明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}
+
+**可引用案例**：[针对本题主题，推荐2个具体的、真实的案例或数据，每个一行，格式为"· 案例名称或数据：一句话说明如何用于本题"。如没有找到可靠案例，写"无"]
+
+**一句话**：[一条具体可操作的建议，格式为"你可以……"，不超过20字]
+
 **评分**：[X/10，整数，必须与客观数据一致]
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
@@ -4631,6 +4659,42 @@ function showResult(session, evalText) {
 
   const cm = evalText.match(/\*\*鼓励\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   document.getElementById('res-cheer').textContent = cm ? cm[1].trim() : '继续坚持，每天进步一点点。';
+
+  // 一句话建议
+  const oneM = evalText.match(/\*\*一句话\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
+  const oneDiv = document.getElementById('res-oneliner');
+  const oneText = document.getElementById('res-oneliner-text');
+  if (oneM && oneM[1].trim()) {
+    oneText.textContent = oneM[1].trim();
+    oneDiv.style.display = '';
+  } else {
+    // Fallback based on data
+    const tm2 = session.metrics;
+    if (tm2 && tm2.totalFillers > 3) {
+      oneText.textContent = '你可以试着放慢一点，每说完一个观点停一拍';
+    } else if (session.duration && session.duration < 90) {
+      oneText.textContent = '你可以试着说满2分钟，给每个观点多留一句话的时间';
+    } else {
+      oneText.textContent = '你可以把这个话题记下来，下周再练一次';
+    }
+    oneDiv.style.display = '';
+  }
+
+  // 可引用案例
+  const casesM = evalText.match(/\*\*可引用案例\*\*[：:]([\s\S]*?)(?=\*\*评分\*\*|$)/);
+  const casesDiv = document.getElementById('res-cases');
+  const casesText = document.getElementById('res-cases-text');
+  if (casesM) {
+    const raw = casesM[1].trim();
+    if (raw && raw !== '无' && raw !== '无。') {
+      casesText.innerHTML = raw.replace(/\n/g, '<br>');
+      casesDiv.style.display = '';
+    } else {
+      casesDiv.style.display = 'none';
+    }
+  } else {
+    casesDiv.style.display = 'none';
+  }
 
   // 重置调试面板
   document.getElementById('debug-panel').style.display = 'none';
