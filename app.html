@@ -947,6 +947,14 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <div id="res-score-reason" style="display:none;"></div>
 
+  <!-- 跟上次比 -->
+  <div id="res-compare" style="display:none;">
+    <div style="background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:12px 16px;">
+      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px;">📌 跟上次比</div>
+      <div id="res-compare-text" style="font-size:14px;color:var(--text);line-height:1.7;"></div>
+    </div>
+  </div>
+
   <!-- 论点展开：词汇升级 + 展开对比 -->
   <div id="exp-result-section" style="display:none;">
     <div id="exp-vocab-upgrade" class="card" style="margin-bottom:10px;"></div>
@@ -4396,6 +4404,56 @@ ${session.transcript}
 /* ═══════════════════════════════════════
    RESULT
 ═══════════════════════════════════════ */
+function findSimilarSession(current) {
+  const all = allSessions.filter(s => s.id !== current.id);
+  if (!all.length) return { prev: null, summary: '' };
+
+  // Try same theme first
+  let prev = all.find(s => s.theme === current.theme);
+  // If no same theme, try same mode
+  if (!prev) prev = all.find(s => s.mode === current.mode);
+  // Fallback: most recent
+  if (!prev) prev = all[0];
+  if (!prev) return { prev: null, summary: '' };
+
+  const cm = current.metrics || {};
+  const pm = prev.metrics || {};
+  const durNow = Math.floor((current.duration || 0) / 60);
+  const durPrev = Math.floor((prev.duration || 0) / 60);
+
+  let lines = [];
+  lines.push('上次同类练习：' + prev.date);
+
+  if (pm.totalFillers !== undefined && cm.totalFillers !== undefined) {
+    const diff = cm.totalFillers - pm.totalFillers;
+    if (diff < 0) lines.push('填充词从 ' + pm.totalFillers + ' → ' + cm.totalFillers + ' 次（少了 ' + Math.abs(diff) + ' 次 ↘）');
+    else if (diff > 0) lines.push('填充词从 ' + pm.totalFillers + ' → ' + cm.totalFillers + ' 次（多了 ' + diff + ' 次，注意一下）');
+    else lines.push('填充词都是 ' + cm.totalFillers + ' 次，保持住了');
+  }
+
+  if (pm.pace && cm.pace) {
+    const paceDiff = cm.pace - pm.pace;
+    if (Math.abs(paceDiff) > 10) {
+      lines.push('语速从 ' + pm.pace + ' → ' + cm.pace + ' 字/分钟' + (paceDiff < 0 ? '（更稳了）' : '（偏快了）'));
+    }
+  }
+
+  if (durNow && durPrev && Math.abs(durNow - durPrev) >= 1) {
+    lines.push('时长从 ' + durPrev + '分 → ' + durNow + '分' + (durNow > durPrev ? '（更长了）' : ''));
+  }
+
+  // If previous had a good score, mention it
+  if (prev.evaluation) {
+    const prevScoreM = prev.evaluation.match(/\*\*评分\*\*[：:]\s*(\d+)/);
+    const prevScore = prevScoreM ? parseInt(prevScoreM[1]) : 0;
+    if (prevScore >= 7) {
+      lines.push('那次你的回答里有好东西，可以回想一下那次是怎么说的');
+    }
+  }
+
+  return { prev, summary: lines.join('<br>') };
+}
+
 function showResult(session, evalText) {
   computeStreak();
   document.getElementById('res-score').textContent = session.score;
@@ -4404,6 +4462,17 @@ function showResult(session, evalText) {
   document.getElementById('res-topic-display').innerHTML =
     `<div class="label" style="margin-bottom:6px;">${session.theme}</div>
      <div style="font-size:15px;font-weight:500;line-height:1.5;">${session.topic}</div>`;
+
+  // Show comparison with previous practice
+  const compareDiv = document.getElementById('res-compare');
+  const compareText = document.getElementById('res-compare-text');
+  const cmp = findSimilarSession(session);
+  if (cmp.prev && cmp.summary) {
+    compareText.innerHTML = cmp.summary;
+    compareDiv.style.display = '';
+  } else {
+    compareDiv.style.display = 'none';
+  }
 
   document.getElementById('res-labels').innerHTML = session.labels
     ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
