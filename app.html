@@ -964,24 +964,28 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <!-- 反思与改进：跟上次比 + 可引用案例 + 说话节奏 -->
   <div id="res-improve" style="display:block;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:14px 16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px;">🔄 反思与改进</div>
+    <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px;border-left:2px solid var(--gold);padding-left:8px;">反思与改进</div>
 
     <div id="res-compare" style="display:none;">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">📌 跟上次比</div>
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;border-left:2px solid var(--gold);padding-left:8px;">跟上次比</div>
       <div id="res-compare-content" style="font-size:13px;color:var(--muted);line-height:1.7;"></div>
     </div>
 
     <div id="res-compare-sep" style="display:none;height:1px;background:var(--divider);margin:12px 0;"></div>
 
     <div id="res-cases" style="display:none;">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">💡 这道题可以引用</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+        <span style="font-size:12px;font-weight:600;color:var(--muted);border-left:2px solid var(--gold);padding-left:8px;">如果再说一次，中间可以这样说</span>
+        <button onclick="toggleCasesBody()" id="cases-toggle-btn" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0;">展开 ▲</button>
+      </div>
       <div id="res-cases-content" style="font-size:13px;color:var(--text);line-height:1.7;"></div>
+      <div id="res-cases-more" style="display:none;font-size:13px;color:var(--text);line-height:1.7;margin-top:4px;"></div>
     </div>
 
     <div id="res-cases-sep" style="display:none;height:1px;background:var(--divider);margin:12px 0;"></div>
 
     <div id="res-rhythm" style="display:block;">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">📈 说话节奏</div>
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;border-left:2px solid var(--gold);padding-left:8px;">说话节奏</div>
       <div style="font-size:11px;color:var(--muted-extra);margin-bottom:4px;">波形起伏 = 说话音量，红条 = 卡顿停顿</div>
       <canvas id="rhythm-canvas" style="width:100%;height:140px;border-radius:8px;background:var(--card2);display:block;"></canvas>
       <div style="font-size:11px;color:var(--muted-extra);margin:8px 0 4px;">每段柱高 = 该段语速，绿色正常 · 偏快/偏慢会变色</div>
@@ -1401,22 +1405,22 @@ input:focus { outline: none; border-color: var(--gold); }
   </div>
 
   <div style="background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:16px;">
-    <div class="label" style="margin-bottom:10px;">📊 练习分布</div>
+    <div class="label" style="margin-bottom:10px;border-left:2px solid var(--gold);padding-left:8px;">练习分布</div>
     <div id="archive-distribution"></div>
   </div>
 
   <div style="background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:16px;">
-    <div class="label" style="margin-bottom:10px;">🔥 在变好</div>
+    <div class="label" style="margin-bottom:10px;border-left:2px solid var(--gold);padding-left:8px;">在变好</div>
     <div id="archive-trends" style="font-size:13px;color:var(--muted);line-height:1.8;"></div>
   </div>
 
   <div style="background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:16px;">
-    <div class="label" style="margin-bottom:10px;">🎯 注意到</div>
+    <div class="label" style="margin-bottom:10px;border-left:2px solid var(--gold);padding-left:8px;">注意到</div>
     <div id="archive-notices" style="font-size:13px;color:var(--muted);line-height:1.8;"></div>
   </div>
 
   <div style="background:var(--card);border:1px solid var(--card-border);box-shadow:var(--card-shadow);border-radius:var(--r);padding:16px;">
-    <div class="label" style="margin-bottom:10px;">🎧 听听自己</div>
+    <div class="label" style="margin-bottom:10px;border-left:2px solid var(--gold);padding-left:8px;">听听自己</div>
     <div id="archive-recordings" style="font-size:13px;color:var(--muted);"></div>
   </div>
 </div>
@@ -1901,6 +1905,15 @@ function switchHomeTopicMode(e) {
   renderHomeTopic();
 }
 
+function toggleCasesBody() {
+  const more = document.getElementById('res-cases-more');
+  const btn = document.getElementById('cases-toggle-btn');
+  if (!more || !btn) return;
+  const show = more.style.display === 'none' || !more.style.display;
+  more.style.display = show ? 'block' : 'none';
+  btn.textContent = show ? '收起 ▲' : '展开 ▲';
+}
+
 function retryTopic() {
   // 保存本轮反馈，供再次练习时 AI 参考
   const casesEl = document.getElementById('res-cases-content');
@@ -2274,7 +2287,7 @@ async function renderRhythm(sessionId, duration, metrics, audioMetrics) {
         `· 最长连续无停顿段落约 ${Math.round(segSec)} 秒<br>` +
         `· 停顿 ${audioMetrics?.pauseCount || 0} 次（卡顿 ${audioMetrics?.pauses?.filter(p => p >= penaltySec).length || 0} 次）<br>` +
         `· 最快段 ${Math.round(longestSegment)} 字/分 · 音量变化 ${audioMetrics?.volumeCV ? (audioMetrics.volumeCV < 0.25 ? '较单调' : audioMetrics.volumeCV < 0.5 ? '有起伏' : '变化丰富') : '—'}` +
-        (duration < 60 ? '<br><span style="color:var(--gold);">💡 当前录音不足 60 秒，节奏分析仅供参考。</span>' : '');
+        (duration < 60 ? '<br><span style="color:var(--gold);">当前录音不足 60 秒，节奏分析仅供参考。</span>' : '');
     }
 
     sectionEl.style.display = 'block';
@@ -2332,17 +2345,11 @@ function highlightSlips(transcript, evaluation, metrics) {
 function parseEvalSections(evalText) {
   if (!evalText) return [];
   const keys = [
-    { k: '叙事结构', icon: '📖' },
-    { k: '细节生动性', icon: '🎨' },
-    { k: '词语串联', icon: '🔗' },
-    { k: '逻辑结构', icon: '🧩' },
-    { k: '语言流畅度', icon: '🗣' },
-
-    { k: '明日聚焦', icon: '🎯' },
-    { k: '口误标记', icon: '🔍' },
-    { k: '评分理由', icon: '💬' },
+    '叙事结构', '细节生动性', '词语串联',
+    '逻辑结构', '语言流畅度',
+    '明日聚焦', '口误标记', '评分理由'
   ];
-  return keys.map(({ k, icon }) => {
+  return keys.map(k => {
     const m = evalText.match(new RegExp(`\\*\\*${k}\\*\\*[：:]([\\s\\S]*?)(?=\\*\\*|$)`));
     return m ? { k, icon, text: m[1].trim() } : null;
   }).filter(Boolean);
@@ -2409,7 +2416,7 @@ function renderHistList(sessions) {
             const txt = s.k === '口误标记'
               ? s.text.split(/[；;\n]/).map(t => t.replace(/^[\s·•\-\*\d]+[.、\s]*/, '').trim()).filter(t => t && t !== '无').map(t => `· ${t}`).join('<br>') || '无'
               : s.text;
-            return `<div class="eval-sect"><span class="label">${s.icon} ${s.k}</span><p>${txt}</p></div>`;
+            return `<div class="eval-sect"><span class="label" style="border-left:2px solid var(--gold);padding-left:8px;">${s.k}</span><p>${txt}</p></div>`;
           }).join('')}
         </div>` : ''}
 
@@ -4636,33 +4643,33 @@ function showResult(session, evalText) {
   const am = session.audioMetrics;
   document.getElementById('res-metrics').innerHTML = '';
 
-  const slipSect = session.asrType === 'api' ? [{ k: '口误标记', icon: '🔍' }] : [];
+  const slipSect = session.asrType === 'api' ? [{ k: '口误标记' }] : [];
   const sects = session.mode === 'expansion'
     ? [
-      { k: '展开诊断', icon: '📊' },
-      { k: '明日聚焦', icon: '🎯' },
+      { k: '展开诊断' },
+      { k: '明日聚焦' },
       ...slipSect,
     ]
     : session.mode === 'story'
     ? [
-      { k: '叙事结构', icon: '📖' },
-      { k: '细节生动性', icon: '🎨' },
-      { k: '语言流畅度', icon: '🗣' },
-      { k: '明日聚焦', icon: '🎯' },
+      { k: '叙事结构' },
+      { k: '细节生动性' },
+      { k: '语言流畅度' },
+      { k: '明日聚焦' },
       ...slipSect,
     ]
     : session.mode === 'word'
     ? [
-      { k: '词语串联', icon: '🔗' },
-      { k: '逻辑结构', icon: '🧩' },
-      { k: '语言流畅度', icon: '🗣' },
-      { k: '明日聚焦', icon: '🎯' },
+      { k: '词语串联' },
+      { k: '逻辑结构' },
+      { k: '语言流畅度' },
+      { k: '明日聚焦' },
       ...slipSect,
     ]
     : [
-      { k: '逻辑结构', icon: '🧩' },
-      { k: '语言流畅度', icon: '🗣' },
-      { k: '明日聚焦', icon: '🎯' },
+      { k: '逻辑结构' },
+      { k: '语言流畅度' },
+      { k: '明日聚焦' },
       ...slipSect,
     ];
 
@@ -4693,7 +4700,7 @@ function showResult(session, evalText) {
         <div class="metric-hint">${am.volumeCV < 0.25 ? '较单调' : am.volumeCV < 0.5 ? '有起伏' : '变化丰富'}</div>
       </div>` : '';
     sectHtml += `<div class="eval-sect">
-      <span class="label">📊 客观数据</span>
+      <span class="label" style="border-left:2px solid var(--gold);padding-left:8px;">客观数据</span>
       <div class="metrics-grid">
         <div class="metric-item">
           <div class="metric-val ${paceClass}">${tm.pace}</div>
@@ -4718,20 +4725,20 @@ function showResult(session, evalText) {
   }
 
   // AI 评估段
-  sects.forEach(({ k, icon }) => {
+  sects.forEach(({ k }) => {
     const m = evalText.match(new RegExp(`\\*\\*${k}\\*\\*[：:]([\\s\\S]*?)(?=\\*\\*|$)`));
     if (!m) return;
     const rawText = m[1].trim();
     const formatted = k === '口误标记'
       ? rawText.split(/[；;\n]/).map(s => s.replace(/^[\s·•\-\*\d]+[.、\s]*/, '').trim()).filter(s => s && s !== '无').map(s => `· ${s}`).join('<br>') || '无'
       : rawText;
-    sectHtml += `<div class="eval-sect"><span class="label">${icon} ${k}</span><p>${formatted}</p></div>`;
+    sectHtml += `<div class="eval-sect"><span class="label" style="border-left:2px solid var(--gold);padding-left:8px;">${k}</span><p>${formatted}</p></div>`;
   });
 
   // 评分理由段
   const reasonM = evalText.match(/\*\*评分理由\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   if (reasonM) {
-    sectHtml += `<div class="eval-sect"><span class="label">💬 评分理由</span><p style="color:var(--muted);">${reasonM[1].trim()}</p></div>`;
+    sectHtml += `<div class="eval-sect"><span class="label" style="border-left:2px solid var(--gold);padding-left:8px;">评分理由</span><p style="color:var(--muted);">${reasonM[1].trim()}</p></div>`;
   }
 
   const cont = document.getElementById('res-evals');
@@ -4749,7 +4756,7 @@ function showResult(session, evalText) {
     if (vocabM) {
       const lines = vocabM[1].trim().split('\n').filter(l => l.includes('→'));
       vocabDiv.innerHTML = `
-        <div class="label" style="margin-bottom:8px;">📝 词汇升级</div>
+        <div class="label" style="margin-bottom:8px;border-left:2px solid var(--gold);padding-left:8px;">词汇升级</div>
         ${lines.map(l => {
           const parts = l.split('|').map(s => s.trim());
           const mainParts = (parts[0] || l).split('→').map(s => s.trim());
@@ -4768,7 +4775,7 @@ function showResult(session, evalText) {
     // 展开对比
     const demoM = evalText.match(/\*\*展开示范\*\*[：:]([\s\S]*?)(?=\*\*评分\*\*|$)/);
     compareDiv.innerHTML = `
-      <div class="label" style="margin-bottom:8px;">📖 展开对比</div>
+      <div class="label" style="margin-bottom:8px;border-left:2px solid var(--gold);padding-left:8px;">展开对比</div>
       <div class="muted" style="font-size:11px;margin-bottom:6px;">你的回答</div>
       <div class="exp-original">${session.transcript || '（无转写内容）'}</div>
       <div class="muted" style="font-size:11px;margin:10px 0 6px;">AI 展开示范</div>
@@ -4811,15 +4818,25 @@ function showResult(session, evalText) {
   }
   document.getElementById('res-compare-sep').style.display = compareEl.style.display;
 
-  // ── 可引用案例 ──
+  // ── 如果再说一次 ──
   const casesEl = document.getElementById('res-cases');
   const casesContent = document.getElementById('res-cases-content');
+  const casesMore = document.getElementById('res-cases-more');
+  const casesBtn = document.getElementById('cases-toggle-btn');
   const casesM = evalText.match(/\*\*可引用案例\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   if (casesM) {
     const raw = casesM[1].trim();
     const items = raw.split('\n').filter(l => l.trim()).map(l => l.replace(/^[\s·\-\*\d]+[.\s]*/, '').trim());
     if (items.length && items[0] !== '无') {
-      casesContent.innerHTML = items.map(s => `<div style="margin-bottom:4px;">· ${s}</div>`).join('');
+      casesContent.innerHTML = `<div style="margin-bottom:6px;">${items[0]}</div>`;
+      if (items.length > 1) {
+        casesMore.innerHTML = items.slice(1).map(s => `<div style="margin-bottom:6px;">${s}</div>`).join('');
+        casesMore.style.display = 'none';
+        if (casesBtn) { casesBtn.style.display = 'inline'; casesBtn.textContent = '展开 ▲'; }
+      } else {
+        casesMore.innerHTML = '';
+        if (casesBtn) casesBtn.style.display = 'none';
+      }
       casesEl.style.display = 'block';
     } else {
       casesEl.style.display = 'none';
