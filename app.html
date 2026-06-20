@@ -4377,6 +4377,7 @@ async function generateHighScore(session) {
   const section = document.getElementById('highscore-section');
   if (!section) return;
   section.style.display = 'block';
+  document.getElementById('highscore-expanded').style.display = 'block';
   const styleEl = document.getElementById('highscore-style-chips');
   if (styleEl) styleEl.style.display = 'flex';
   // 初始提示，等用户选风格后再生成
