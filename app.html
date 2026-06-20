@@ -1363,6 +1363,18 @@ input:focus { outline: none; border-color: var(--gold); }
     </label>
   </div>
 
+  <!-- 过滤测试 -->
+  <div class="flex" style="align-items:center; justify-content:space-between;">
+    <div>
+      <div class="label">过滤低分测试</div>
+      <div class="hint" style="font-size:12px; margin-top:2px;">评分低于2分或评估失败的不保留到历史</div>
+    </div>
+    <label class="toggle-wrap" style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
+      <input type="checkbox" id="cfg-filter-low-scores" style="opacity:0; width:0; height:0;">
+      <span style="position:absolute;cursor:pointer;inset:0;background:var(--toggle-track);border-radius:13px;transition:.2s;"></span>
+    </label>
+  </div>
+
   <div class="mt-auto flex col gap-10">
     <button class="btn btn-gold" onclick="saveSettings()">保存</button>
     <button class="btn btn-ghost" style="color:var(--red);" onclick="confirmClearAll()">清空所有数据</button>
@@ -1718,6 +1730,7 @@ let S = {
   history: [],
   streak: 0,
   noSR: false,
+  filterLowScores: ls('filter_low_scores') !== '0',
   lastFeedback: '',
   retryCount: 0,
 };
@@ -2639,6 +2652,7 @@ function goSettings() {
   document.getElementById('cfg-interview-twostage').checked = S.interviewTwoStage;
   document.getElementById('cfg-enable-think-model').checked = S.enableThinkModel;
   document.getElementById('cfg-eval-thinking').checked = S.evalThinking;
+  document.getElementById('cfg-filter-low-scores').checked = S.filterLowScores;
   document.getElementById('cfg-think-model').value = S.thinkModel;
   updateTargetDurChips(S.targetDur);
   show('s-settings');
@@ -2751,6 +2765,8 @@ function saveSettings() {
   ls('think_model', S.thinkModel);
   S.evalThinking = document.getElementById('cfg-eval-thinking').checked;
   ls('eval_thinking', S.evalThinking ? '1' : '0');
+  S.filterLowScores = document.getElementById('cfg-filter-low-scores').checked;
+  ls('filter_low_scores', S.filterLowScores ? '1' : '0');
   ls('target_dur', S.targetDur);
   goHome();
 }
@@ -4372,9 +4388,13 @@ ${transcriptLabel}
       expSource: mode === 'expansion' ? _expState.source : undefined,
       expSourceTopic: mode === 'expansion' ? (_expState.sourceTopic?.text || '') : undefined,
     };
-    await saveSession(session);
-    allSessions.unshift(session);
-    S.history = allSessions;
+    const _scoreNum = score === '—' ? 0 : parseInt(score);
+    const _isTest = S.filterLowScores && _scoreNum < 2;
+    if (!_isTest) {
+      await saveSession(session);
+      allSessions.unshift(session);
+      S.history = allSessions;
+    }
     showResult(session, evalText);
 
     // 后台并行：优化版本 + 高分示范
@@ -4396,9 +4416,12 @@ ${transcriptLabel}
       expSource: mode === 'expansion' ? _expState.source : undefined,
       expSourceTopic: mode === 'expansion' ? (_expState.sourceTopic?.text || '') : undefined,
     };
-    await saveSession(fallbackSession);
-    allSessions.unshift(fallbackSession);
-    S.history = allSessions;
+    const _isTest = S.filterLowScores;
+    if (!_isTest) {
+      await saveSession(fallbackSession);
+      allSessions.unshift(fallbackSession);
+      S.history = allSessions;
+    }
     showResult(fallbackSession, '');
     const evalArea = document.getElementById('res-eval');
     if (evalArea) evalArea.innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">评估获取失败，转写已保留<br><button onclick="retryEval()" style="margin-top:10px;background:none;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:6px 18px;cursor:pointer;font-size:13px;">重新评估</button></div>`;
@@ -4916,6 +4939,13 @@ function showResult(session, evalText) {
 
   // ── 节奏可视化 ──
   renderRhythm(session.id, session.duration, session.metrics, session.audioMetrics);
+
+  // ── 低分测试提示 ──
+  const saved = allSessions.some(s => s.id === session.id);
+  if (!saved) {
+    const meta = document.getElementById('res-meta');
+    if (meta) meta.textContent += ' · 测试记录未保存';
+  }
 
   show('s-result');
 }
