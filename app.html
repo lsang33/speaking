@@ -978,9 +978,9 @@ input:focus { outline: none; border-color: var(--gold); }
 
     <div id="res-rhythm" style="display:block;">
       <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;border-left:2px solid var(--gold);padding-left:8px;">说话节奏</div>
-      <div style="font-size:11px;color:var(--muted-extra);margin-bottom:4px;">波形起伏 = 说话音量，红条 = 卡顿停顿</div>
+      <div style="font-size:11px;color:var(--muted-extra);margin-bottom:4px;">绿色 = 在说话，灰色 = 停顿/沉默</div>
       <canvas id="rhythm-canvas" style="width:100%;height:140px;border-radius:8px;background:var(--card2);display:block;"></canvas>
-      <div style="font-size:11px;color:var(--muted-extra);margin:8px 0 4px;">每段柱高 = 该段语速，绿色正常 · 偏快/偏慢会变色</div>
+      <div style="font-size:11px;color:var(--muted-extra);margin:8px 0 4px;">每段柱高 = 语速，绿=正常 红=偏快/偏慢</div>
       <canvas id="pace-canvas" style="width:100%;height:60px;border-radius:8px;background:var(--card2);margin-top:6px;display:block;"></canvas>
       <div id="rhythm-notes" style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;"></div>
     </div>
@@ -1733,6 +1733,7 @@ let S = {
   filterLowScores: ls('filter_low_scores') !== '0',
   lastFeedback: '',
   retryCount: 0,
+  favIds: JSON.parse(ls('favs') || '[]'),
 };
 
 /* ═══════════════════════════════════════
@@ -2096,8 +2097,8 @@ function goHistory() {
 }
 
 function renderHistory() {
-  const filtered = histFilter === 'all'
-    ? allSessions
+  const filtered = histFilter === 'all' ? allSessions
+    : histFilter === 'fav' ? allSessions.filter(s => S.favIds.includes(s.id))
     : allSessions.filter(s => s.theme === histFilter);
 
   renderCalendar();
@@ -2156,17 +2157,21 @@ function renderHistFilter() {
   const el = document.getElementById('hist-filter');
   const themes = [...new Set(allSessions.map(s => s.theme))];
   if (!themes.length) { el.innerHTML = ''; return; }
-  el.innerHTML = ['all', ...themes].map(t => `
-    <button class="filter-btn ${histFilter === t ? 'active' : ''}"
-      onclick="setHistFilter('${t}')">
-      ${t === 'all' ? '全部' : t}
-    </button>`).join('');
+  const buttons = [
+    `<button class="filter-btn ${histFilter === 'all' ? 'active' : ''}" onclick="setHistFilter('all')">全部</button>`,
+    `<button class="filter-btn ${histFilter === 'fav' ? 'active' : ''}" onclick="setHistFilter('fav')">收藏</button>`,
+    ...themes.map(t => `<button class="filter-btn ${histFilter === t ? 'active' : ''}" onclick="setHistFilter('${t}')">${t}</button>`)
+  ];
+  el.innerHTML = buttons.join('');
 }
 
 function setHistFilter(theme) {
   histFilter = theme;
   expandedSessions.clear();
-  const filtered = theme === 'all' ? allSessions : allSessions.filter(s => s.theme === theme);
+  let filtered;
+  if (theme === 'all') filtered = allSessions;
+  else if (theme === 'fav') filtered = allSessions.filter(s => S.favIds.includes(s.id));
+  else filtered = allSessions.filter(s => s.theme === theme);
   renderHistFilter();
   renderHistList(filtered);
 }
@@ -2213,36 +2218,28 @@ async function renderRhythm(sessionId, duration, metrics, audioMetrics) {
     c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card2').trim() || '#eeeef2';
     c.fillRect(0, 0, w, h);
 
-    // pause markers
-    const pauses = audioMetrics?.pauses || [];
-    const penaltySec = ((parseInt(S.pausePenalty) || 4000) / 1000);
-    const totalSec = duration;
-    pauses.forEach(p => {
-      if (p >= penaltySec) {
-        // approximate position: distribute pauses evenly since we don't have exact times
-      }
-    });
-
-    // envelope curve
-    c.beginPath();
-    c.moveTo(pad, pad + ph);
-    for (let i = 0; i < normEnv.length; i++) {
-      const x = pad + (i / (normEnv.length - 1)) * pw;
-      const y = pad + ph - normEnv[i] * ph;
-      c.lineTo(x, y);
+    // activity timeline — replace waveform curve
+    const greenColor = getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#4caf6e';
+    const redColor = getComputedStyle(document.documentElement).getPropertyValue('--red').trim() || '#e05252';
+    const threshold = 0.03;
+    const barStep = Math.max(1, Math.floor(normEnv.length / (pw / 3))); // ~3px per bar
+    for (let i = 0; i < normEnv.length; i += barStep) {
+      const avg = normEnv.slice(i, i + barStep).reduce((a, v) => a + v, 0) / barStep;
+      const x = pad + (i / normEnv.length) * pw;
+      const wBar = Math.max(1, (barStep / normEnv.length) * pw);
+      const barH = avg > threshold ? ph : ph * 0.15;
+      const y = pad + ph - barH;
+      c.fillStyle = avg > threshold ? greenColor + '99' : redColor + '40';
+      c.fillRect(x, y, wBar, barH);
     }
-    c.lineTo(pad + pw, pad + ph);
-    c.closePath();
-    const goldColor = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() || '#d4a843';
-    c.fillStyle = goldColor + '26';
-    c.fill();
-    c.strokeStyle = goldColor;
-    c.lineWidth = 1.2;
-    c.stroke();
+    // top stats (overwrite existing text with combined info)
+    const penaltySec = ((parseInt(S.pausePenalty) || 4000) / 1000);
+    const longPauses = audioMetrics?.pauses?.filter(p => p >= penaltySec).length || 0;
 
     // time axis
     c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8b8a94';
     c.font = '10px system-ui';
+    const totalSec = duration;
     const totalLabelSec = Math.ceil(totalSec / 30) * 30;
     for (let t = 0; t <= totalLabelSec; t += 30) {
       const x = pad + (t / totalSec) * pw;
@@ -2250,9 +2247,10 @@ async function renderRhythm(sessionId, duration, metrics, audioMetrics) {
     }
 
     // top stats
+    const goldColor = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() || '#d4a843';
     c.fillStyle = goldColor;
     c.font = 'bold 10px system-ui';
-    c.fillText(`${metrics.chars || 0}字 · ${metrics.totalFillers || 0}口头禅 · ${audioMetrics?.pauseCount || 0}停顿`, pad, pad + 10);
+    c.fillText(`${metrics.chars || 0}字 · ${metrics.totalFillers || 0}口头禅 · 停顿${audioMetrics?.pauseCount || 0}次`, pad, pad + 10);
 
     // ── Draw pace chart ──
     const canvas2 = document.getElementById('pace-canvas');
@@ -2383,6 +2381,7 @@ function renderHistList(sessions) {
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap;">
             <span class="theme-badge">${h.theme || '—'}</span>
             <span style="font-size:11px;color:var(--muted);">${h.date} · ${mins}分${pad(secs)}秒</span>
+            <span onclick="toggleFavorite('${h.id}',event)" style="cursor:pointer;font-size:13px;color:${S.favIds.includes(h.id) ? 'var(--gold)' : 'var(--muted-extra)'};">${S.favIds.includes(h.id) ? '★' : '☆'}</span>
           </div>
           ${h.mode === 'expansion' ? `<div style="font-size:14px;font-weight:500;line-height:1.4;color:var(--gold);">${h.topic || ''}</div>` : h.words && h.words.length ? `
           <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px;">
@@ -2403,7 +2402,7 @@ function renderHistList(sessions) {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <span style="font-size:12px;color:var(--muted);">展开详情</span>
           <div class="flex gap-6">
-            ${h.score === '—' ? `<button class="btn btn-ghost btn-sm" onclick="this.textContent='评估中…';this.disabled=true;this.style.opacity='0.6';retryEvalById('${h.id}');event.stopPropagation();" style="font-size:13px;">↻ 重新评估</button>` : ''}
+            <button class="btn btn-ghost btn-sm" onclick="this.textContent='评估中…';this.disabled=true;this.style.opacity='0.6';retryEvalById('${h.id}');event.stopPropagation();" style="font-size:13px;">↻ 重新评估</button>
             <button class="btn btn-ghost btn-sm" onclick="retryHistSession('${h.id}');event.stopPropagation();" style="font-size:13px;">↩ 重试</button>
           </div>
         </div>
@@ -2449,6 +2448,20 @@ function renderHistList(sessions) {
       </div>
     </div>`;
   }).join('');
+}
+
+function saveFavs() { ls('favs', JSON.stringify(S.favIds)); }
+
+function toggleFavorite(id, ev) {
+  if (ev) ev.stopPropagation();
+  const idx = S.favIds.indexOf(id);
+  if (idx >= 0) S.favIds.splice(idx, 1);
+  else S.favIds.push(id);
+  saveFavs();
+  // 重新渲染当前列表
+  const filtered = histFilter === 'fav' ? allSessions.filter(s => S.favIds.includes(s.id))
+    : histFilter === 'all' ? allSessions : allSessions.filter(s => s.theme === histFilter);
+  renderHistList(filtered);
 }
 
 function toggleSession(id) {
@@ -4517,6 +4530,8 @@ function retryEvalById(id) {
   if (!h) return;
   S.transcript = h.transcript;
   S.sessionId = h.id;
+  S.duration = h.duration || 0;
+  S.audioMetrics = h.audioMetrics || null;
   S.mode = h.mode || 'topic';
   S.topic = { text: h.topic, theme: h.theme, d: 2 };
   if (h.mode === 'word') S.words = h.words || [];
@@ -4990,7 +5005,7 @@ async function exportSingleAudio(session) {
 
 async function exportBatch() {
   const btn = document.getElementById('hist-export-btn');
-  const toExport = (histFilter === 'all' ? allSessions : allSessions.filter(s => s.theme === histFilter))
+  const toExport = (histFilter === 'all' ? allSessions : histFilter === 'fav' ? allSessions.filter(s => S.favIds.includes(s.id)) : allSessions.filter(s => s.theme === histFilter))
     .filter(s => s.id && !s.id.startsWith('legacy'));
 
   if (!toExport.length) { alert('当前筛选下没有可导出的录音'); return; }
