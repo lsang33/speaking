@@ -1366,8 +1366,8 @@ input:focus { outline: none; border-color: var(--gold); }
   <!-- 过滤测试 -->
   <div class="flex" style="align-items:center; justify-content:space-between;">
     <div>
-      <div class="label">过滤低分测试</div>
-      <div class="hint" style="font-size:12px; margin-top:2px;">评分低于2分或评估失败的不保留到历史</div>
+      <div class="label">过滤短发言测试</div>
+      <div class="hint" style="font-size:12px; margin-top:2px;">少于5秒的不保留到历史</div>
     </div>
     <label class="toggle-wrap" style="position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0;">
       <input type="checkbox" id="cfg-filter-low-scores" style="opacity:0; width:0; height:0;">
@@ -2402,7 +2402,10 @@ function renderHistList(sessions) {
       <div class="hist-detail ${open ? 'open' : ''}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <span style="font-size:12px;color:var(--muted);">展开详情</span>
-          <button class="btn btn-ghost btn-sm" onclick="retryHistSession('${h.id}');event.stopPropagation();" style="font-size:13px;">↩ 重试</button>
+          <div class="flex gap-6">
+            ${h.score === '—' ? `<button class="btn btn-ghost btn-sm" onclick="retryEvalById('${h.id}');event.stopPropagation();" style="font-size:13px;">↻ 重新评估</button>` : ''}
+            <button class="btn btn-ghost btn-sm" onclick="retryHistSession('${h.id}');event.stopPropagation();" style="font-size:13px;">↩ 重试</button>
+          </div>
         </div>
 
         ${hasAudio ? `
@@ -4388,8 +4391,7 @@ ${transcriptLabel}
       expSource: mode === 'expansion' ? _expState.source : undefined,
       expSourceTopic: mode === 'expansion' ? (_expState.sourceTopic?.text || '') : undefined,
     };
-    const _scoreNum = score === '—' ? 0 : parseInt(score);
-    const _isTest = S.filterLowScores && _scoreNum < 2;
+    const _isTest = S.filterLowScores && (duration || 0) < 5;
     if (!_isTest) {
       await saveSession(session);
       allSessions.unshift(session);
@@ -4416,12 +4418,9 @@ ${transcriptLabel}
       expSource: mode === 'expansion' ? _expState.source : undefined,
       expSourceTopic: mode === 'expansion' ? (_expState.sourceTopic?.text || '') : undefined,
     };
-    const _isTest = S.filterLowScores;
-    if (!_isTest) {
-      await saveSession(fallbackSession);
-      allSessions.unshift(fallbackSession);
-      S.history = allSessions;
-    }
+    await saveSession(fallbackSession);
+    allSessions.unshift(fallbackSession);
+    S.history = allSessions;
     showResult(fallbackSession, '');
     const evalArea = document.getElementById('res-eval');
     if (evalArea) evalArea.innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">评估获取失败，转写已保留<br><button onclick="retryEval()" style="margin-top:10px;background:none;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:6px 18px;cursor:pointer;font-size:13px;">重新评估</button></div>`;
@@ -4511,6 +4510,21 @@ function saveVariantTopic() {
   saveCustomTopics(customs);
   const btn = document.getElementById('variant-save-btn');
   btn.textContent = '已加入题库 ✓'; btn.style.color = 'var(--gold)'; btn.style.borderColor = 'var(--gold)';
+}
+
+function retryEvalById(id) {
+  const h = allSessions.find(s => s.id === id);
+  if (!h) return;
+  S.transcript = h.transcript;
+  S.sessionId = h.id; // reuse same ID so saveSession overwrites
+  S.mode = h.mode || 'topic';
+  S.topic = { text: h.topic, theme: h.theme, d: 2 };
+  if (h.mode === 'word') S.words = h.words || [];
+  if (h.mode === 'story') { S.storyCategory = h.storyCategory || 'movie'; S.storyTitle = h.storyTitle || ''; }
+  if (h.mode === 'expansion') {
+    _expState = { source: h.expSource || 'manual', sourceTopic: h.expSourceTopic ? { text: h.expSourceTopic, subtype: '' } : null, argument: h.expArgument || h.topic, directions: h.expDirections || [], duration: 90, domain: '', difficulty: 'medium' };
+  }
+  evaluate();
 }
 
 function retryEval() {
