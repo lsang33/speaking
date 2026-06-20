@@ -947,22 +947,6 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <div id="res-score-reason" style="display:none;"></div>
 
-  <!-- 跟上次比 -->
-  <div id="res-compare" style="display:none;">
-    <div style="background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:12px 16px;">
-      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px;">📌 跟上次比</div>
-      <div id="res-compare-text" style="font-size:14px;color:var(--text);line-height:1.7;"></div>
-    </div>
-  </div>
-
-  <!-- 可引用案例 -->
-  <div id="res-cases" style="display:none;">
-    <div style="background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;">
-      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px;">💡 这道题可以引用的</div>
-      <div id="res-cases-text" style="font-size:14px;color:var(--text);line-height:1.8;"></div>
-    </div>
-  </div>
-
   <!-- 论点展开：词汇升级 + 展开对比 -->
   <div id="exp-result-section" style="display:none;">
     <div id="exp-vocab-upgrade" class="card" style="margin-bottom:10px;"></div>
@@ -971,12 +955,16 @@ input:focus { outline: none; border-color: var(--gold); }
 
   <div class="topic-card" style="padding:14px 18px;" id="res-topic-display"></div>
 
-  <!-- 一句话建议 -->
-  <div id="res-oneliner" style="display:none;background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;text-align:center;">
-    <div style="font-size:14px;font-weight:600;color:var(--gold);line-height:1.6;" id="res-oneliner-text"></div>
-  </div>
+  <!-- 一句话建议（轻量，嵌在卡片下方） -->
+  <div id="res-oneliner" style="display:none;font-size:14px;font-weight:600;color:var(--gold);line-height:1.6;padding:0 4px;"></div>
 
   <div id="res-labels"></div>
+
+  <!-- 跟上次比（紧凑一行） -->
+  <div id="res-compare" style="display:none;font-size:13px;color:var(--muted);line-height:1.6;padding:0 4px;"></div>
+
+  <!-- 可引用案例 -->
+  <div id="res-cases" style="display:none;font-size:13px;color:var(--muted);line-height:1.8;padding:8px 12px;background:var(--card2);border-radius:10px;"></div>
 
   <div id="res-metrics"></div>
 
@@ -4535,12 +4523,11 @@ function showResult(session, evalText) {
     `<div class="label" style="margin-bottom:6px;">${session.theme}</div>
      <div style="font-size:15px;font-weight:500;line-height:1.5;">${session.topic}</div>`;
 
-  // Show comparison with previous practice
+  // 跟上次比（紧凑一行）
   const cmpDiv = document.getElementById('res-compare');
-  const cmpText = document.getElementById('res-compare-text');
   const cmp = findSimilarSession(session);
   if (cmp.prev && cmp.summary) {
-    cmpText.innerHTML = cmp.summary;
+    cmpDiv.innerHTML = '📌 ' + cmp.summary;
     cmpDiv.style.display = '';
   } else {
     cmpDiv.style.display = 'none';
@@ -4705,33 +4692,30 @@ function showResult(session, evalText) {
   document.getElementById('res-cheer').textContent = cm ? cm[1].trim() : '继续坚持，每天进步一点点。';
 
   // 一句话建议
-  const oneM = evalText.match(/\*\*一句话\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   const oneDiv = document.getElementById('res-oneliner');
-  const oneText = document.getElementById('res-oneliner-text');
+  const oneM = evalText.match(/\*\*一句话\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
   if (oneM && oneM[1].trim()) {
-    oneText.textContent = oneM[1].trim();
+    oneDiv.textContent = '💡 ' + oneM[1].trim();
     oneDiv.style.display = '';
   } else {
-    // Fallback based on data
     const tm2 = session.metrics;
     if (tm2 && tm2.totalFillers > 3) {
-      oneText.textContent = '你可以试着放慢一点，每说完一个观点停一拍';
+      oneDiv.textContent = '💡 试着放慢一点，每说完一个观点停一拍';
     } else if (session.duration && session.duration < 90) {
-      oneText.textContent = '你可以试着说满2分钟，给每个观点多留一句话的时间';
+      oneDiv.textContent = '💡 试着说满2分钟，给每个观点多留一句话';
     } else {
-      oneText.textContent = '你可以把这个话题记下来，下周再练一次';
+      oneDiv.textContent = '💡 把这个话题记下来，下周再练一次';
     }
     oneDiv.style.display = '';
   }
 
   // 可引用案例
-  const casesM = evalText.match(/\*\*可引用案例\*\*[：:]([\s\S]*?)(?=\*\*评分\*\*|$)/);
   const casesDiv = document.getElementById('res-cases');
-  const casesText = document.getElementById('res-cases-text');
+  const casesM = evalText.match(/\*\*可引用案例\*\*[：:]([\s\S]*?)(?=\*\*评分\*\*|$)/);
   if (casesM) {
     const raw = casesM[1].trim();
     if (raw && raw !== '无' && raw !== '无。') {
-      casesText.innerHTML = raw.replace(/\n/g, '<br>');
+      casesDiv.innerHTML = '💡 <b>这道题可以引用的</b><br>' + raw.replace(/\n/g, '<br>');
       casesDiv.style.display = '';
     } else {
       casesDiv.style.display = 'none';
@@ -4822,11 +4806,11 @@ function showResult(session, evalText) {
     prevScore: session.score || '—',
     prevTranscript: session.transcript || '',
   };
-  const casesEl = document.getElementById('res-cases-text');
+  const casesEl = document.getElementById('res-cases');
   if (casesEl && casesEl.textContent.trim()) {
     window._retryContext.casesText = casesEl.textContent.trim();
   }
-  const compareEl = document.getElementById('res-compare-text');
+  const compareEl = document.getElementById('res-compare');
   if (compareEl && compareEl.textContent.trim()) {
     window._retryContext.compareSummary = compareEl.textContent.trim();
   }
