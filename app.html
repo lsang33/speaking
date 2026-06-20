@@ -1740,6 +1740,7 @@ function dateStr(d) { return d.toISOString().slice(0, 10); }
 function findLastSimilarSession(cur) {
   for (const s of allSessions) {
     if (s.id === cur.id) continue;
+    if (!s.metrics || s.metrics.chars < 20) continue;
     if (s.theme === cur.theme || s.mode === cur.mode) return s;
   }
   return null;
