@@ -2149,7 +2149,7 @@ function setHistFilter(theme) {
 
 async function renderRhythm(sessionId, duration, metrics, audioMetrics) {
   const sectionEl = document.getElementById('res-rhythm');
-  if (!sectionEl || duration < 60) { sectionEl && (sectionEl.style.display = 'none'); return; }
+  if (!sectionEl || duration < 10) { sectionEl && (sectionEl.style.display = 'none'); return; }
   try {
     const blob = await getAudio(sessionId);
     if (!blob) { sectionEl.style.display = 'none'; return; }
