@@ -548,6 +548,7 @@ input:focus { outline: none; border-color: var(--gold); }
     </div>
     <div class="flex" style="align-items:center; gap:8px;">
       <div style="font-size:13px; color:var(--muted);">连续 <span id="h-streak" style="color:var(--gold); font-weight:600;">0</span> 天</div>
+      <button class="settings-icon" onclick="toggleTheme()" id="theme-toggle-btn" title="切换主题">🌙</button>
       <button class="settings-icon" onclick="goSettings()" title="设置">⚙</button>
     </div>
   </div>
@@ -1569,6 +1570,39 @@ input:focus { outline: none; border-color: var(--gold); }
 ═══════════════════════════════════════ */
 // TOPICS 和 INTERVIEW_TOPICS 已移至 topics.js
 // TOPICS 已移至 topics.js
+
+/* ═══════════════════════════════════════
+   THEME
+═══════════════════════════════════════ */
+function initTheme() {
+  const stored = localStorage.getItem('theme');
+  if (stored === 'light' || stored === 'dark') {
+    document.documentElement.setAttribute('data-theme', stored);
+  } else {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+  }
+  updateThemeIcon();
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  updateThemeIcon();
+}
+function updateThemeIcon() {
+  const btn = document.getElementById('theme-toggle-btn');
+  if (!btn) return;
+  btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+  if (!localStorage.getItem('theme')) {
+    document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+    updateThemeIcon();
+  }
+});
+initTheme();
 
 /* ═══════════════════════════════════════
    INDEXEDDB (audio storage)
