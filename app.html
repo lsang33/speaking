@@ -4547,7 +4547,13 @@ function retryEvalById(id) {
   S.audioMetrics = h.audioMetrics || null;
   S.mode = h.mode || 'topic';
   S.topic = { text: h.topic, theme: h.theme, d: 2 };
-  if (h.mode === 'word') S.words = h.words || [];
+  if (h.mode === 'word') {
+    S.words = h.words || [];
+    // 兜底：从 topic 文本解析词语
+    if (!S.words.length && h.topic && h.topic.startsWith('词语串联：')) {
+      S.words = h.topic.replace('词语串联：', '').split(/[、,，]/).filter(Boolean);
+    }
+  }
   if (h.mode === 'story') { S.storyCategory = h.storyCategory || 'movie'; S.storyTitle = h.storyTitle || ''; }
   if (h.mode === 'expansion') {
     _expState = { source: h.expSource || 'manual', sourceTopic: h.expSourceTopic ? { text: h.expSourceTopic, subtype: '' } : null, argument: h.expArgument || h.topic, directions: h.expDirections || [], duration: 90, domain: '', difficulty: 'medium' };
