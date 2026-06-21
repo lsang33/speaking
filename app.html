@@ -947,6 +947,8 @@ input:focus { outline: none; border-color: var(--gold); }
     <div id="exp-compare" class="card"></div>
   </div>
 
+  <div id="res-dim-scores" style="display:none;" class="flex col gap-4"></div>
+
   <div class="topic-card" style="padding:14px 18px;" id="res-topic-display"></div>
 
   <div id="res-labels"></div>
@@ -4316,9 +4318,64 @@ ${transcriptLabel}
 **鼓励**：[一句话，不超过15字]
 **可引用案例**：[根据故事主题推荐2-3个可引用的真实案例或数据，每条不超过40字。格式：- 案例名：一句话说明]
 `;
+  } else if (topic.theme === '结构化面试') {
+    // ── 结构化面试模式 ──
+    prompt = `你是一名资深结构化面试考官，正在为考生评估一道结构化面试题的回答。${asrAccurateNote}
+
+【题目】「${topic.text}」
+
+【客观数据——这是精确统计值，评分必须与之一致】
+- 发言时长：${dur}（${durationNote}，目标 90-210 秒）
+- 有效字数：${tm.chars} 字
+- 语速：${tm.pace} 字/分钟（${paceNote}，正常范围 200-270）
+- 口头禅次数：${tm.totalFillers} 次（${fillerDetail}）
+- 重复词次数：${tm.totalRepeats} 次（${repeatDetail}）
+- 句子数：${tm.sentences} 句
+${audioSection}
+
+${transcriptLabel}
+「${transcript || '（未能获取转写内容）'}」
+
+评分参照公务员面试考官评分表：
+- 逻辑结构（权重30%）：框架完整、层次清晰、有观点有论据
+- 政策站位（权重25%）：体现政治素养、时政热点积累、政策理解准确
+- 对策具体性（权重25%）：有可行做法、具体案例支撑、而非空话套话
+- 语言表达（权重20%）：规范流畅、口头禅少、语速自然、逻辑词使用得当
+
+9-10分：四维全面优秀，作答如面试高分考生
+7-8分：框架正确，论证较充分，有一两处亮点
+5-6分：框架基本完整但内容偏空，或某维度明显短板
+3-4分：框架混乱，内容空洞，或口头禅极多
+1-2分：内容极少，无关题目
+
+【题目标签参考——判断本题最匹配的标签，每类别选一个】
+问题性质：形式主义/懒政怠政/脱离群众/本领恐慌/政绩观偏差/制度滞后
+价值导向：人民至上/实事求是/系统思维/守正创新/共建共治共享/公平正义
+逻辑关系：活力与秩序/发展与安全/效率与公平/短期与长远/整体与个体/传统与现代
+
+【输出格式——严格按此】
+
+**题目标签**：[问题性质] | [价值导向] | [逻辑关系]
+
+**逻辑结构**：[框架是否完整，层次是否清晰，有无观点-论据-升华]
+**语言流畅度**：[结合口头禅和停顿数据评价，口头禅点名，长停顿须指出]
+
+**明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}
+
+**分项评分**
+逻辑结构：X/10 [一句理由]
+政策站位：X/10 [一句理由]
+对策具体性：X/10 [一句理由]
+语言表达：X/10 [一句理由]
+**综合评分**：X/10（各维度加权平均，权重：逻辑30%/站位25%/对策25%/表达20%）
+
+**评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
+**鼓励**：[一句话，不超过15字]
+**可引用案例**：[根据题目主题推荐2-3个可引用的真实案例或数据，每条不超过40字。格式：- 案例名：一句话说明]
+`;
   } else {
-    // ── 普通题目模式 ──
-    prompt = `你是口才训练教练，正在评估一位以央视主持人大赛为目标的学员。${asrAccurateNote}
+    // ── 普通（口才）模式 ──
+    prompt = `你是口才教练，正在评估一位以央视主持人大赛为目标的学员。${asrAccurateNote}
 
 【题目】「${topic.text}」（主题：${topic.theme}）
 
@@ -4334,19 +4391,19 @@ ${audioSection}
 ${transcriptLabel}
 「${transcript || '（未能获取转写内容）'}」
 
-【评分标准——严格参照，不得虚高】
-9-10分：逻辑完整（观点→论据→升华），口头禅 0 次，无卡顿停顿，语速适中，有感染力，时长达标
-7-8分：逻辑清晰，口头禅 ≤2 次，卡顿停顿≤1次，能完整表达观点，时长基本达标
-5-6分：有基本观点但逻辑松散，口头禅 3-5 次，或卡顿停顿2次，或时长不足 90 秒
-3-4分：思路混乱，口头禅 ≥6 次，或卡顿停顿≥3次，或严重偏题，或时长极短
-1-2分：内容极少、无关主题或无法理解
+评分维度：
+- 语言表达（权重30%）：词汇丰富度、句式多样性、修辞运用
+- 流畅度（权重25%）：口头禅频率、语速稳定性、停顿自然度
+- 结构清晰（权重25%）：起承转合、逻辑连贯、观点明确
+- 感染力（权重20%）：生动性、画面感、情感传递
 
-【题目标签参考——判断本题最匹配的标签，每类别选一个】
-问题性质：形式主义/懒政怠政/脱离群众/本领恐慌/政绩观偏差/制度滞后
-价值导向：人民至上/实事求是/系统思维/守正创新/共建共治共享/公平正义
-逻辑关系：活力与秩序/发展与安全/效率与公平/短期与长远/整体与个体/传统与现代
+9-10分：语言丰富有感染力，结构完整，流畅自然，时长达标
+7-8分：语言较好，结构清晰，口头禅≤2次，无明显卡顿
+5-6分：有基本结构但表达偏平淡，口头禅3-5次
+3-4分：思路混乱，口头禅≥6次，或卡顿严重
+1-2分：内容极少
 
-【输出格式——严格按此，每项不超过2句】
+【输出格式——严格按此】
 
 **题目标签**：[问题性质] | [价值导向] | [逻辑关系]
 
@@ -4354,7 +4411,14 @@ ${transcriptLabel}
 **语言流畅度**：[结合口头禅和停顿数据评价，口头禅点名，长停顿须指出]
 
 **明日聚焦**：[最应改进的一点，给出具体做法]${slipSection}
-**评分**：[X/10，整数，必须与客观数据一致]
+
+**分项评分**
+语言表达：X/10 [一句理由]
+流畅度：X/10 [一句理由]
+结构清晰：X/10 [一句理由]
+感染力：X/10 [一句理由]
+**综合评分**：X/10（各维度平均分）
+
 **评分理由**：[一句话点明得这个分的最主要原因，直接说核心扣分或加分项]
 **鼓励**：[一句话，不超过15字]
 **可引用案例**：[根据题目主题推荐2-3个可引用的真实案例或数据，每条不超过40字。格式：- 案例名：一句话说明]
@@ -4376,8 +4440,16 @@ ${transcriptLabel}
     }
     S.debugLastResponse = evalText;
 
-    const scoreM = evalText.match(/\*\*评分\*\*[：:]\s*(\d+)/);
+    const scoreM = evalText.match(/\*\*综合评分\*\*[：:]\s*([\d.]+)/) || evalText.match(/\*\*评分\*\*[：:]\s*(\d+)/);
     const score = scoreM ? scoreM[1] : '—';
+    const dimM = evalText.match(/\*\*分项评分\*\*[：:]([\s\S]*?)(?=\*\*|$)/);
+    const dimScores = {};
+    if (dimM) {
+      dimM[1].trim().split('\n').forEach(function(l) {
+        var m = l.match(/^(.+?)[：:]\s*([\d.]+)\/10\s*(.*)/);
+        if (m) dimScores[m[1].trim()] = { score: parseFloat(m[2]), reason: m[3].trim() };
+      });
+    }
 
     const labelM = evalText.match(/\*\*题目标签\*\*[：:]\s*(.+)/);
     const labelStr = labelM ? labelM[1].trim().replace(/[*_#]/g, '').replace(/[\[\]【】]/g, '') : '';
@@ -4406,6 +4478,7 @@ ${transcriptLabel}
       labels: labelParts.length === 3 ? { problem: labelParts[0], value: labelParts[1], logic: labelParts[2] } : null,
       optimized: '',
       highScore: '',
+      dimScores: Object.keys(dimScores).length ? dimScores : null,
       metrics: analyzeTranscript(S.transcript, duration),
       audioMetrics: S.audioMetrics,
       // expansion 特有字段
@@ -4733,6 +4806,26 @@ ${session.transcript}
 function showResult(session, evalText) {
   computeStreak();
   document.getElementById('res-score').textContent = session.score;
+
+  // ── 分项评分 ──
+  const dimEl = document.getElementById('res-dim-scores');
+  if (session.dimScores && Object.keys(session.dimScores).length) {
+    const dims = Object.entries(session.dimScores);
+    dimEl.innerHTML = dims.map(([name, d]) =>
+      `<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+        <span style="width:68px;flex-shrink:0;color:var(--muted);text-align:right;">${name}</span>
+        <div style="flex:1;height:10px;background:var(--card2);border-radius:5px;overflow:hidden;">
+          <div style="height:100%;width:${Math.round(d.score/10*100)}%;background:var(--gold);border-radius:5px;opacity:0.7;"></div>
+        </div>
+        <span style="width:24px;flex-shrink:0;color:var(--gold);font-weight:600;font-size:12px;">${d.score}</span>
+        ${d.reason ? `<span style="font-size:11px;color:var(--muted-extra);">${d.reason}</span>` : ''}
+      </div>`
+    ).join('');
+    dimEl.style.display = '';
+  } else {
+    dimEl.style.display = 'none';
+  }
+
   document.getElementById('res-meta').textContent =
     `${session.date} · ${Math.floor(session.duration/60)}分${session.duration%60}秒 · 连续${S.streak}天`;
   document.getElementById('res-topic-display').innerHTML =
