@@ -4582,6 +4582,8 @@ ${session.transcript}`;
     const idx = allSessions.findIndex(s => s.id === session.id);
     if (idx >= 0) allSessions[idx] = session;
     if (el) el.innerHTML = formatExample(text);
+    const ttsBtn = document.getElementById('optimize-tts-btn');
+    if (ttsBtn) ttsBtn.style.display = S.ttsEnabled ? '' : 'none';
   } catch(e) {
     const el = document.getElementById('optimize-text');
     if (el) el.innerHTML = '<span style="color:var(--muted);font-size:13px;">优化版本生成失败</span>';
