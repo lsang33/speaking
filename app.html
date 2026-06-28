@@ -6408,10 +6408,10 @@ function renderTopicsPage() {
 
   // ═══ 上传按钮 helper ═══
   function uploadBtn(t) {
-    var text = (t.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    var theme = (t.theme || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    var subtype = (t.subtype || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    return '<button class="bank-item-practice" onclick="uploadTopicAudio(\'' + text + '\',\'' + theme + '\',\'' + subtype + '\')" title="上传音频评估" style="font-size:13px;">📤</button>';
+    var text = (t.text || '').replace(/"/g, '&quot;');
+    var theme = (t.theme || '').replace(/"/g, '&quot;');
+    var subtype = (t.subtype || '').replace(/"/g, '&quot;');
+    return '<button class="bank-item-practice upload-audio-btn" data-topic="' + text + '" data-theme="' + theme + '" data-subtype="' + subtype + '" title="上传音频评估" style="font-size:13px;">📤</button>';
   }
 
   // ═══ 通用 item 渲染 ── 两行布局：题目文字 + 底部 meta │ 按钮 ═══
@@ -6592,6 +6592,19 @@ function deleteCustomTopic(i) {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function() {});
 }
+
+/* ── 上传按钮事件委托 ── */
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.upload-audio-btn');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var topic = btn.getAttribute('data-topic') || '';
+  var theme = btn.getAttribute('data-theme') || '';
+  var subtype = btn.getAttribute('data-subtype') || '';
+  uploadTopicAudio(topic, theme, subtype);
+});
+
 init();
 </script>
 </body>
