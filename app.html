@@ -2713,7 +2713,7 @@ function fillAsrPreset(name) {
   }
 }
 
-async function transcribeAudio(blob) {
+async function _sendASR(blob) {
   const baseUrl = (S.asrUrl || '').replace(/\/$/, '');
   const key = S.asrKey || S.apiKey;
   const model = S.asrModel || 'FunAudioLLM/SenseVoiceSmall';
@@ -2735,6 +2735,28 @@ async function transcribeAudio(blob) {
   }
   const data = await resp.json();
   return (data.text || '').trim();
+}
+
+async function transcribeAudio(blob, segments) {
+  // 先尝试完整发送
+  try {
+    return await _sendASR(blob);
+  } catch (e) {
+    // 5xx 服务端错误才降级分段；4xx（鉴权/参数错误）直接报
+    if (!segments || segments.length <= 1 || !/ASR 接口错误 5\d{2}/.test(e.message)) throw e;
+    console.log('[ASR] 完整发送失败，降级分段发送（' + segments.length + '段）');
+  }
+
+  // 逐段发送，结果拼接
+  const results = [];
+  for (let i = 0; i < segments.length; i++) {
+    document.getElementById('eval-sub').textContent =
+      `ASR 分段转写中（${i + 1}/${segments.length}）……`;
+    const segBlob = new Blob([segments[i]], { type: blob.type });
+    const text = await _sendASR(segBlob);
+    if (text) results.push(text);
+  }
+  return results.join('\n');
 }
 
 function fillPreset(name) {
@@ -3759,7 +3781,7 @@ function startMediaRecorder() {
     S.audioChunks = [];
     S.mediaStream = stream;
     mr.ondataavailable = e => { if (e.data.size > 0) S.audioChunks.push(e.data); };
-    mr.start(1000);
+    mr.start(60000);
     S.mediaRecorder = mr;
 
     // Real-time silence detection via AnalyserNode
@@ -3870,6 +3892,7 @@ function stopMediaRecorder() {
     if (!S.mediaRecorder || S.mediaRecorder.state === 'inactive') { resolve(null); return; }
     S.mediaRecorder.onstop = () => {
       const mimeType = S.mediaRecorder.mimeType || 'audio/webm';
+      S._asrSegments = S.audioChunks.length > 1 ? [...S.audioChunks] : null;
       const blob = new Blob(S.audioChunks, { type: mimeType });
       if (S.mediaStream) { S.mediaStream.getTracks().forEach(t => t.stop()); S.mediaStream = null; }
       S.mediaRecorder = null;
@@ -4006,7 +4029,7 @@ async function stopRec() {
     document.getElementById('eval-sub').textContent = `调用 ASR 接口转写中（${(audioBlob.size/1024).toFixed(0)} KB，${audioBlob.type}）`;
     show('s-eval');
     try {
-      const apiText = await transcribeAudio(audioBlob);
+      const apiText = await transcribeAudio(audioBlob, S._asrSegments);
       if (apiText) {
         S.transcript = apiText;
         console.log('[ASR] success, length=' + apiText.length, 'preview:', apiText.slice(0, 80));
