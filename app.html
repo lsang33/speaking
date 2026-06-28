@@ -2818,8 +2818,11 @@ function uploadTopicAudio(topicText, topicTheme, topicSubtype) {
   var input = document.createElement('input');
   input.type = 'file';
   input.accept = 'audio/*';
+  input.style.display = 'none';
+  document.body.appendChild(input);
   input.onchange = async function() {
     var file = input.files[0];
+    document.body.removeChild(input);
     if (!file) return;
     S.sessionId = Date.now().toString();
     S.mode = 'topic';
@@ -6403,9 +6406,9 @@ function renderTopicsPage() {
 
   // ═══ 上传按钮 helper ═══
   function uploadBtn(t) {
-    var text = (t.text || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-    var theme = (t.theme || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-    var subtype = (t.subtype || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    var text = (t.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    var theme = (t.theme || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    var subtype = (t.subtype || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     return '<button class="bank-item-practice" onclick="uploadTopicAudio(\'' + text + '\',\'' + theme + '\',\'' + subtype + '\')" title="上传音频评估" style="font-size:13px;">📤</button>';
   }
 
