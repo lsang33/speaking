@@ -2718,7 +2718,10 @@ async function _sendASR(blob) {
   const baseUrl = (S.asrUrl || '').replace(/\/$/, '');
   const key = S.asrKey || S.apiKey;
   const model = S.asrModel || 'FunAudioLLM/SenseVoiceSmall';
-  const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('webm') ? 'webm' : 'wav';
+  const ext = blob.type.includes('mp4') || blob.type.includes('m4a') ? 'm4a'
+    : blob.type.includes('webm') ? 'webm'
+    : blob.type.includes('mpeg') || blob.type.includes('mp3') ? 'mp3'
+    : blob.type.includes('wav') ? 'wav' : 'wav';
 
   const form = new FormData();
   form.append('file', blob, `audio.${ext}`);
@@ -2768,6 +2771,99 @@ async function transcribeAudio(blob, segments) {
   if (failed > 0) console.log('[ASR] 分段完成：' + results.length + '/' + segments.length + ' 段成功，' + failed + ' 段失败');
   return results.join('\n');
 }
+
+/* ── 音频上传 ── */
+function audioBufferToWav(buffer) {
+  var nc = buffer.numberOfChannels, sr = buffer.sampleRate, len = buffer.length;
+  var blockAlign = nc * 2, dataSize = len * blockAlign;
+  var buf = new ArrayBuffer(44 + dataSize), v = new DataView(buf);
+  function ws(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+  ws(0, 'RIFF'); v.setUint32(4, 36 + dataSize, true); ws(8, 'WAVE');
+  ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, nc, true); v.setUint32(24, sr, true);
+  v.setUint32(28, sr * blockAlign, true); v.setUint16(32, blockAlign, true);
+  v.setUint16(34, 16, true); ws(36, 'data'); v.setUint32(40, dataSize, true);
+  var off = 44;
+  for (var i = 0; i < len; i++) {
+    for (var ch = 0; ch < nc; ch++) {
+      var s = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
+      v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      off += 2;
+    }
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+async function splitAudioBlob(blob, segSec) {
+  var ctx = new (window.AudioContext || window.webkitAudioContext)();
+  var arrayBuf = await blob.arrayBuffer();
+  var audioBuf = await ctx.decodeAudioData(arrayBuf);
+  ctx.close();
+  var sr = audioBuf.sampleRate, nc = audioBuf.numberOfChannels, total = audioBuf.length;
+  var segSamples = segSec * sr, segments = [];
+  for (var start = 0; start < total; start += segSamples) {
+    var end = Math.min(start + segSamples, total);
+    var chunkLen = end - start;
+    var offline = new OfflineAudioContext(nc, chunkLen, sr);
+    var src = offline.createBufferSource();
+    var chunkBuf = offline.createBuffer(nc, chunkLen, sr);
+    for (var ch = 0; ch < nc; ch++) chunkBuf.copyToChannel(audioBuf.getChannelData(ch).slice(start, end), ch);
+    src.buffer = chunkBuf; src.connect(offline.destination); src.start();
+    segments.push(audioBufferToWav(await offline.startRendering()));
+  }
+  return segments;
+}
+
+function uploadTopicAudio(topicText, topicTheme, topicSubtype) {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'audio/*';
+  input.onchange = async function() {
+    var file = input.files[0];
+    if (!file) return;
+    S.sessionId = Date.now().toString();
+    S.mode = 'topic';
+    S.topic = { text: topicText, theme: topicTheme || '面试', subtype: topicSubtype || '' };
+    S.startTime = Date.now();
+    S.asrType = 'upload';
+    S.transcript = '';
+    S.audioChunks = [];
+    S._asrSegments = null;
+    saveAudio(S.sessionId, file).catch(function() {});
+    show('s-eval');
+    document.getElementById('eval-spin').style.display = 'block';
+    document.getElementById('eval-status').textContent = '正在识别语音（上传）……';
+    document.getElementById('eval-sub').textContent = file.name + '（' + (file.size / 1048576).toFixed(1) + ' MB）';
+    document.getElementById('eval-actions').style.display = 'none';
+    try {
+      document.getElementById('eval-sub').textContent = '正在处理音频分段……';
+      var ctxTmp = new (window.AudioContext || window.webkitAudioContext)();
+      var arrayBufTmp = await file.arrayBuffer();
+      var audioBufTmp = await ctxTmp.decodeAudioData(arrayBufTmp);
+      ctxTmp.close();
+      S._uploadDuration = Math.round(audioBufTmp.duration);
+      S.duration = S._uploadDuration;
+      var segments = await splitAudioBlob(file, 60);
+      S._asrSegments = segments;
+      _uploadFileRef = file;
+      var apiText = await transcribeAudio(file, segments);
+      if (apiText) {
+        S.transcript = apiText;
+        document.getElementById('eval-status').textContent = 'AI 正在评估……';
+        document.getElementById('eval-sub').textContent = '分析逻辑结构与表达流畅度';
+        evaluate();
+      } else {
+        showASRFallback(file);
+      }
+    } catch (e) {
+      console.error('[Upload] ASR failed:', e.message);
+      _uploadFileRef = file;
+      showASRFallback(file);
+    }
+  };
+  input.click();
+}
+var _uploadFileRef = null;
 
 function fillPreset(name) {
   const p = PRESETS[name];
@@ -4130,7 +4226,7 @@ function showASRFallback(audioBlob) {
            : mode === 'story' ? '讲述模式'
            : (topic ? topic.theme : ''),
       asrType: 'api',
-      duration: S.startTime ? Math.round((Date.now() - S.startTime) / 1000) : 0,
+      duration: S._uploadDuration || (S.startTime ? Math.round((Date.now() - S.startTime) / 1000) : 0),
       transcript: '(语音识别失败)',
       evaluation: '',
       score: 0,
@@ -6255,6 +6351,7 @@ function renderTopicsPage() {
           <div class="flex gap-6" style="flex-shrink:0;align-items:center;">
             ${noteBtn(t.text, notes)}
             ${favBtn(t.text, favs)}
+            ${uploadBtn(t)}
             ${practiceBtn}
           </div>
           ${noteArea(t.text, notes)}
@@ -6304,6 +6401,14 @@ function renderTopicsPage() {
 
   let html = '';
 
+  // ═══ 上传按钮 helper ═══
+  function uploadBtn(t) {
+    var text = (t.text || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    var theme = (t.theme || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    var subtype = (t.subtype || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    return '<button class="bank-item-practice" onclick="uploadTopicAudio(\'' + text + '\',\'' + theme + '\',\'' + subtype + '\')" title="上传音频评估" style="font-size:13px;">📤</button>';
+  }
+
   // ═══ 通用 item 渲染 ── 两行布局：题目文字 + 底部 meta │ 按钮 ═══
   function renderItem(text, metaHtml, btnsHtml, done, noteText) {
     return `<div class="bank-item${done ? ' practiced' : ''}">
@@ -6338,7 +6443,7 @@ function renderTopicsPage() {
         const idx = INTERVIEW_TOPICS.indexOf(t);
         const done = practiced.has(t.text);
         const metaHtml = `<span class="theme-badge">${t.subtype}</span>` + (t.theme ? `<span class="bank-item-source" style="color:var(--gold);">${t.theme}</span>` : '') + (t.source ? `<span class="bank-item-source">${t.source}</span>` : '');
-        const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}<button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>`;
+        const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}${uploadBtn(t)}<button class="bank-item-practice" onclick="startInterviewTopic(${idx})">练习</button>`;
         return renderItem(t.text, metaHtml, btnsHtml, done, t.text);
       }).join('');
     });
@@ -6355,7 +6460,7 @@ function renderTopicsPage() {
       const idx = TOPICS.indexOf(t);
       const done = practiced.has(t.text);
       const metaHtml = t.source ? `<span class="bank-item-source">${t.source}</span>` : '';
-      const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}<button class="bank-item-practice" onclick="startBuiltinTopic(${idx})">练习</button>`;
+      const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}${uploadBtn(t)}<button class="bank-item-practice" onclick="startBuiltinTopic(${idx})">练习</button>`;
       return renderItem(t.text, metaHtml, btnsHtml, done, t.text);
     }).join('');
   }
@@ -6372,7 +6477,7 @@ function renderTopicsPage() {
         if (!t) return '';
         const done = practiced.has(text);
         const metaHtml = `<span class="theme-badge">${t.theme || ''}</span>`;
-        const btnsHtml = `${noteBtn(text, notes)}${favBtn(text, favs)}<button class="bank-item-practice" data-favtext="${text.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" onclick="startFavoriteTopic(this.dataset.favtext)">练习</button>`;
+        const btnsHtml = `${noteBtn(text, notes)}${favBtn(text, favs)}${uploadBtn(t)}<button class="bank-item-practice" data-favtext="${text.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" onclick="startFavoriteTopic(this.dataset.favtext)">练习</button>`;
         return renderItem(text, metaHtml, btnsHtml, done, text);
       }).join('');
     }
@@ -6388,7 +6493,7 @@ function renderTopicsPage() {
       html += customs.map((t, i) => {
         const done = practiced.has(t.text);
         const metaHtml = `<span class="theme-badge">${t.theme}</span>`;
-        const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}<button class="bank-item-practice" onclick="startCustomTopic(${i})">练习</button><button class="bank-item-del" onclick="deleteCustomTopic(${i})">删</button>`;
+        const btnsHtml = `${noteBtn(t.text, notes)}${favBtn(t.text, favs)}${uploadBtn(t)}<button class="bank-item-practice" onclick="startCustomTopic(${i})">练习</button><button class="bank-item-del" onclick="deleteCustomTopic(${i})">删</button>`;
         return renderItem(t.text, metaHtml, btnsHtml, done, t.text);
       }).join('');
     }
