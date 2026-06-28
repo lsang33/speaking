@@ -2815,6 +2815,7 @@ async function splitAudioBlob(blob, segSec) {
 }
 
 function uploadTopicAudio(topicText, topicTheme, topicSubtype) {
+  console.log('[Upload] button clicked, topic:', topicText);
   var input = document.createElement('input');
   input.type = 'file';
   input.accept = 'audio/*';
@@ -2823,7 +2824,8 @@ function uploadTopicAudio(topicText, topicTheme, topicSubtype) {
   input.onchange = async function() {
     var file = input.files[0];
     document.body.removeChild(input);
-    if (!file) return;
+    if (!file) { console.log('[Upload] no file selected'); return; }
+    console.log('[Upload] file selected:', file.name, file.size);
     S.sessionId = Date.now().toString();
     S.mode = 'topic';
     S.topic = { text: topicText, theme: topicTheme || '面试', subtype: topicSubtype || '' };
