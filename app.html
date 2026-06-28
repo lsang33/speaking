@@ -4034,13 +4034,16 @@ async function stopRec() {
         S.transcript = apiText;
         console.log('[ASR] success, length=' + apiText.length, 'preview:', apiText.slice(0, 80));
       } else {
-        alert(`ASR 接口返回空文本。\n音频大小：${(audioBlob.size/1024).toFixed(0)} KB\n音频格式：${audioBlob.type}\n\n可能原因：①音量过低 ②音频太短 ③模型不支持当前格式 ④麦克风没拾到声音`);
-        goReady();
+        alert('ASR 返回空文本，可能是音量过低或音频太短。\n录音已保存，请手动输入转写内容。');
+        document.getElementById('eval-status').textContent = '语音识别未返回结果';
+        document.getElementById('eval-sub').textContent = '录音已保存，请手动输入你说的话';
+        document.getElementById('manual-overlay').style.display = 'flex';
         return;
       }
     } catch(e) {
-      alert('ASR 调用失败：\n' + e.message + '\n\n请检查 ASR 地址、Key、模型名是否正确，以及账户是否有余额。');
-      goReady();
+      document.getElementById('eval-status').textContent = '语音识别失败';
+      document.getElementById('eval-sub').textContent = '请手动输入你说的话（已尝试自动降级分段）';
+      document.getElementById('manual-overlay').style.display = 'flex';
       return;
     }
     document.getElementById('eval-status').textContent = 'AI 正在评估……';
