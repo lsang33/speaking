@@ -2745,18 +2745,27 @@ async function transcribeAudio(blob, segments) {
   } catch (e) {
     // 5xx 服务端错误才降级分段；4xx（鉴权/参数错误）直接报
     if (!segments || segments.length <= 1 || !/ASR 接口错误 5\d{2}/.test(e.message)) throw e;
-    console.log('[ASR] 完整发送失败，降级分段发送（' + segments.length + '段）');
+    console.log('[ASR] 完整发送失败（' + e.message + '），降级分段发送（' + segments.length + '段）');
   }
 
-  // 逐段发送，结果拼接
-  const results = [];
-  for (let i = 0; i < segments.length; i++) {
+  // 逐段发送，单段失败不中断，部分结果也返回
+  var results = [];
+  var failed = 0;
+  for (var i = 0; i < segments.length; i++) {
     document.getElementById('eval-sub').textContent =
-      `ASR 分段转写中（${i + 1}/${segments.length}）……`;
-    const segBlob = new Blob([segments[i]], { type: blob.type });
-    const text = await _sendASR(segBlob);
-    if (text) results.push(text);
+      'ASR 分段转写中（' + (i + 1) + '/' + segments.length + '，失败 ' + failed + ' 段）……';
+    try {
+      var segBlob = new Blob([segments[i]], { type: blob.type });
+      var text = await _sendASR(segBlob);
+      if (text) results.push(text);
+      else failed++;
+    } catch (segErr) {
+      console.error('[ASR] 第' + (i + 1) + '段失败:', segErr.message);
+      failed++;
+    }
   }
+  if (!results.length) throw new Error('全部 ' + segments.length + ' 段均识别失败');
+  if (failed > 0) console.log('[ASR] 分段完成：' + results.length + '/' + segments.length + ' 段成功，' + failed + ' 段失败');
   return results.join('\n');
 }
 
@@ -4090,8 +4099,8 @@ function showASRFallback(audioBlob) {
 
   document.getElementById('eval-status').textContent = '语音识别失败';
   document.getElementById('eval-sub').textContent = segCount > 1
-    ? '已自动尝试完整发送和 ' + segCount + ' 段分段发送，均未成功'
-    : '已自动尝试完整发送，未成功';
+    ? '完整发送失败 → 自动降级 ' + segCount + ' 段分段发送，均未成功'
+    : '完整发送失败，录音不足 60 秒无法分段';
   document.getElementById('eval-actions').innerHTML = `
     <button class="btn btn-gold" style="flex:1;" onclick="(function(){var f=arguments[0];f();})(_asrRetry)">🔄 重试</button>
     <button class="btn btn-ghost" style="flex:1;" onclick="_asrManual()">✏️ 手动输入</button>
