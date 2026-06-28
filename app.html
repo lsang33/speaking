@@ -918,9 +918,10 @@ input:focus { outline: none; border-color: var(--gold); }
 
 <!-- ═══ EVALUATING ═══ -->
 <div id="s-eval" class="screen flex col center gap-16">
-  <div class="spin"></div>
+  <div class="spin" id="eval-spin"></div>
   <div style="font-size:17px; font-weight:500;" id="eval-status">AI 正在评估……</div>
   <div class="muted" id="eval-sub">分析逻辑结构与表达流畅度</div>
+  <div class="flex gap-8" id="eval-actions" style="display:none; margin-top:8px;"></div>
 </div>
 
 <!-- ═══ RESULT ═══ -->
@@ -4028,22 +4029,22 @@ async function stopRec() {
     document.getElementById('eval-status').textContent = '正在识别语音……';
     document.getElementById('eval-sub').textContent = `调用 ASR 接口转写中（${(audioBlob.size/1024).toFixed(0)} KB，${audioBlob.type}）`;
     show('s-eval');
+    let asrFailed = false;
     try {
       const apiText = await transcribeAudio(audioBlob, S._asrSegments);
       if (apiText) {
         S.transcript = apiText;
         console.log('[ASR] success, length=' + apiText.length, 'preview:', apiText.slice(0, 80));
       } else {
-        alert('ASR 返回空文本，可能是音量过低或音频太短。\n录音已保存，请手动输入转写内容。');
-        document.getElementById('eval-status').textContent = '语音识别未返回结果';
-        document.getElementById('eval-sub').textContent = '录音已保存，请手动输入你说的话';
-        document.getElementById('manual-overlay').style.display = 'flex';
-        return;
+        asrFailed = true;
       }
     } catch(e) {
-      document.getElementById('eval-status').textContent = '语音识别失败';
-      document.getElementById('eval-sub').textContent = '请手动输入你说的话（已尝试自动降级分段）';
-      document.getElementById('manual-overlay').style.display = 'flex';
+      console.error('[ASR] failed:', e.message);
+      asrFailed = true;
+    }
+
+    if (asrFailed) {
+      showASRFallback(audioBlob);
       return;
     }
     document.getElementById('eval-status').textContent = 'AI 正在评估……';
@@ -4061,6 +4062,76 @@ async function stopRec() {
     }
   }
   showEval();
+}
+
+function showASRFallback(audioBlob) {
+  const segCount = S._asrSegments ? S._asrSegments.length : 0;
+  document.getElementById('eval-spin').style.display = 'none';
+  const retryFn = async function() {
+    document.getElementById('eval-spin').style.display = 'block';
+    document.getElementById('eval-status').textContent = '正在重试语音识别……';
+    document.getElementById('eval-sub').textContent = '';
+    document.getElementById('eval-actions').style.display = 'none';
+    try {
+      const apiText = await transcribeAudio(audioBlob, S._asrSegments);
+      if (apiText) {
+        S.transcript = apiText;
+        document.getElementById('eval-status').textContent = 'AI 正在评估……';
+        document.getElementById('eval-sub').textContent = '分析逻辑结构与表达流畅度';
+        evaluate();
+      } else {
+        showASRFallback(audioBlob);
+      }
+    } catch(e) {
+      console.error('[ASR] retry failed:', e.message);
+      showASRFallback(audioBlob);
+    }
+  };
+
+  document.getElementById('eval-status').textContent = '语音识别失败';
+  document.getElementById('eval-sub').textContent = segCount > 1
+    ? '已自动尝试完整发送和 ' + segCount + ' 段分段发送，均未成功'
+    : '已自动尝试完整发送，未成功';
+  document.getElementById('eval-actions').innerHTML = `
+    <button class="btn btn-gold" style="flex:1;" onclick="(function(){var f=arguments[0];f();})(_asrRetry)">🔄 重试</button>
+    <button class="btn btn-ghost" style="flex:1;" onclick="_asrManual()">✏️ 手动输入</button>
+    <button class="btn btn-ghost" style="flex:1; color:var(--muted);" onclick="_asrGiveUp()">放弃</button>
+  `;
+  document.getElementById('eval-actions').style.display = 'flex';
+  window._asrRetry = retryFn;
+  window._asrManual = function() {
+    document.getElementById('eval-actions').style.display = 'none';
+    document.getElementById('manual-tx').value = '';
+    document.getElementById('manual-overlay').style.display = 'flex';
+  };
+  window._asrGiveUp = async function() {
+    // 保存最小会话记录，音频已在 IndexedDB
+    var mode = S.mode || 'topic';
+    var topic = S.topic;
+    var minimalSession = {
+      id: S.sessionId,
+      date: today(),
+      mode: mode,
+      topic: mode === 'expansion' ? (_expState.argument || '')
+           : mode === 'word' ? ('词语串联：' + (getWordChips ? getWordChips().join('、') : ''))
+           : mode === 'story' ? (S.storyTitle || '')
+           : (topic ? topic.text : ''),
+      theme: mode === 'expansion' ? '论点展开'
+           : mode === 'word' ? '词语串联'
+           : mode === 'story' ? '讲述模式'
+           : (topic ? topic.theme : ''),
+      asrType: 'api',
+      duration: S.startTime ? Math.round((Date.now() - S.startTime) / 1000) : 0,
+      transcript: '(语音识别失败)',
+      evaluation: '',
+      score: 0,
+      labels: null,
+      optimized: '',
+      highScore: '',
+    };
+    await saveSession(minimalSession);
+    goHome();
+  };
 }
 
 function submitManual() {
